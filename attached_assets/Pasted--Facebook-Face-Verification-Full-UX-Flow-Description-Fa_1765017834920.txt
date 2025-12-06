@@ -1,0 +1,148 @@
+
+📸 Facebook Face Verification – Full UX Flow Description
+
+Facebook’s face verification appears when the system needs to confirm a user’s identity for security.
+The flow is minimal, white, clean, and centered, similar to the login page.
+
+🔹 1. Entry Screen – “Confirm Your Identity”
+
+Layout
+	•	White background
+	•	Facebook blue logo at the top
+	•	Big bold title: “Confirm your identity”
+	•	Simple explanatory text:
+“We need to verify your identity before you can continue to Facebook.”
+
+Action Button
+	•	Blue button: “Continue”
+
+🔹 2. Face Verification Explanation Screen
+
+Title
+	•	“Use your face to confirm it’s you”
+
+Body Text
+
+Explains something like:
+	•	“We’ll compare a video of your face to your profile photos. This helps us confirm it’s your account.”
+
+Illustration
+	•	Often a generic silhouette head graphic (not personal)
+	•	Light blue or grey accent
+
+Buttons
+	•	Continue (primary, blue)
+	•	Cancel (small text link)
+
+🔹 3. Camera Permission Prompt
+
+If camera permission isn’t granted:
+	•	Dialog-style card
+	•	Text:
+“Allow Facebook to use your camera to take a short video of your face.”
+	•	Buttons:
+	•	Allow
+	•	Not now
+
+If already allowed → it jumps straight to the camera view.
+
+🔹 4. Recording Instructions Screen
+
+Title
+	•	“Take a video selfie”
+
+Instruction Text
+
+Something like:
+	•	“Center your face in the frame.”
+	•	“Slowly turn your head left, then right.”
+
+Visual
+	•	Live camera preview already visible in a rounded rectangle or circular frame
+	•	Animated outline showing how to move head (for guidance)
+
+Button
+	•	Start Recording
+
+🔹 5. Recording Screen
+
+Visual
+	•	Fullscreen or large camera feed
+	•	Circular indicator around the face
+	•	Small text at the top:
+“Follow the instructions on the screen.”
+
+Instructions show one by one:
+	•	“Turn your head left.”
+	•	“Turn your head right.”
+	•	“Look up.”
+	•	“Look down.”
+
+(Some flows use only left-right.)
+
+Footer
+	•	Tiny cancel link: “Cancel verification”
+
+🔹 6. Upload & Processing Screen
+
+Layout
+	•	White background
+	•	Spinning progress circle (thin, Meta-style)
+	•	Text:
+“Verifying video…”
+“This may take a few moments.”
+
+No buttons or interactions at this stage.
+
+🔹 7. Result Screen – Success
+
+Title
+	•	“Identity Confirmed”
+
+Text
+	•	“You can now continue to Facebook.”
+
+Button
+	•	Continue
+
+🔹 8. Result Screen – Manual Review or Unable to Verify
+
+If verification fails or needs manual check:
+
+Title
+	•	“We couldn’t verify your identity”
+or
+	•	“We need more information”
+
+Text
+
+Explains the next step:
+	•	Upload ID
+	•	Wait for review
+	•	Try again later
+
+Buttons
+	•	Upload ID
+	•	Try again
+	•	Return to login
+
+🧩 Flow Summary (Blueprint)
+
+1. Confirm Identity
+2. Use Face Verification Intro
+3. Camera Permission
+4. Video Selfie Instructions
+5. Record Face Movements
+6. Upload + Processing
+7. Identity Confirmed (success)
+8. Or: Verification Failed → ID upload
+
+🎨 UI Style Notes
+	•	White minimalist background
+	•	Blue primary (#1877F2)
+	•	Grey secondary text (#65676B)
+	•	Rounded buttons
+	•	Centered layout
+	•	Large spacing between steps
+	•	Generic illustrations
+	•	Camera view in rounded-corner frame
