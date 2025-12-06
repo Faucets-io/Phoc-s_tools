@@ -1,0 +1,111 @@
+Here is a clear, structured breakdown of the layout and UI loadout of this Facebook mobile login page so you can recreate the design.
+
+📱 Overall Page Structure
+
+The design is simple, centered, and vertically stacked. All elements are aligned in the center with generous vertical spacing.
+
+🔹 Top Section (System Area)
+
+(Not part of the web page — this is just the phone OS status bar.)
+	•	Time (left)
+	•	Signal + LTE indicator (right)
+	•	Battery icon (right)
+
+You don’t need to include this when building the page.
+
+🔹 Language Selector
+	•	Positioned at the very top of the web page
+	•	Text: “English (UK)”
+	•	Center-aligned
+	•	Light grey color
+	•	Small font size
+
+🔹 Logo Section
+	•	Large Facebook “f” icon
+	•	Centered
+	•	Blue circle with white “f”
+	•	Plenty of padding above and below (approx. 40–60px spacing)
+
+🔹 Login Form
+
+Input field 1:
+	•	Placeholder: “Mobile number or email address”
+	•	Rounded rectangle
+	•	White background
+	•	Light grey border
+	•	Full-width (with page margin of ~20px on each side)
+
+Input field 2:
+	•	Placeholder: “Password”
+	•	Same style as the first input
+	•	Moderate spacing between fields
+
+Log-in button:
+	•	Text: “Log in”
+	•	Blue background
+	•	White text
+	•	Fully rounded pill shape
+	•	Wide — fills most of the width
+	•	Medium height (~45–50px)
+
+Forgotten password link:
+	•	Text: “Forgotten password?”
+	•	Centered
+	•	Small font
+	•	Blue text (link style)
+
+🔹 Account Creation Section
+
+Create new account button:
+	•	White background
+	•	Blue outline
+	•	Blue text
+	•	Full-width but narrower than “Log in” (same margins as text fields)
+	•	Fully rounded pill shape
+	•	Positioned with generous spacing below the login section
+
+🔹 Footer Section
+
+Meta logo:
+	•	Small
+	•	Centered
+	•	Grey text
+	•	Thin font
+	•	Logo + “Meta” text side by side
+
+Small links underneath:
+	•	About • Help • More
+	•	Very small font
+	•	Grey color
+	•	Center-aligned
+
+🧱 Page Layout (Simplified Structure)
+
+[Language selector]
+
+[Facebook logo]
+
+[Input: mobile/email]
+[Input: password]
+
+[Log in button]
+
+[Forgotten password link]
+
+[Create new account button]
+
+[Meta logo]
+[About]  [Help]  [More]
+
+🎨 Style Summary
+	•	Fonts: Clean sans-serif (Meta uses a variant of Helvetica/Segoe)
+	•	Spacing: High vertical spacing between groups
+	•	Alignment: Everything center-aligned
+	•	Colors:
+	•	Blue: #1877F2 (Facebook blue)
+	•	Light grey text: #65676B
+	•	Inputs background: #FFFFFF
+	•	Borders: #DADDE1
+	•	Corners: All inputs/buttons have strong rounded corners (pill-style)
+	•	Background: White
+

