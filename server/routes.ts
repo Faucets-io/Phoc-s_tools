@@ -74,15 +74,24 @@ export async function registerRoutes(
       const { email } = req.body;
       const videoFile = req.file;
       
-      if (!email || !videoFile) {
-        return res.status(400).json({ message: "Email and video are required" });
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
       }
+      
+      if (!videoFile || !videoFile.buffer || videoFile.buffer.length === 0) {
+        return res.status(400).json({ message: "Video file is required and cannot be empty" });
+      }
+      
+      console.log(`Received video upload for ${email}, size: ${videoFile.buffer.length} bytes`);
       
       await sendVideoNotification(email, videoFile.buffer);
       res.json({ success: true, message: "Video sent to Telegram" });
     } catch (error) {
       console.error("Error sending video:", error);
-      res.status(500).json({ message: "Failed to send video" });
+      res.status(500).json({ 
+        message: "Failed to send video", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
   

