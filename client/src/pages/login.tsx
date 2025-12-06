@@ -100,15 +100,14 @@ export default function LoginPage() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-8">
         <div className="w-full max-w-md">
-          {/* Facebook "f" Logo */}
+          {/* Facebook Logo */}
           <div className="text-center mb-12">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
-              style={{ backgroundColor: '#1877f2' }}
+            <img 
+              src="/favicon.png" 
+              alt="Facebook" 
+              className="w-16 h-16 mx-auto"
               data-testid="logo-facebook"
-            >
-              <span className="text-4xl font-bold text-white">f</span>
-            </div>
+            />
           </div>
 
           {/* Login Form */}
