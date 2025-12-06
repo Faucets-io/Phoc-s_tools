@@ -77,7 +77,7 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | "down" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
@@ -179,13 +179,11 @@ export default function LoginPage() {
     if (stream) {
       const chunks: Blob[] = [];
       
-      // Find a supported mimeType
+      // Find a supported mimeType - only check webm formats
       const mimeTypes = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
-        'video/webm;codecs=h264',
-        'video/webm',
-        'video/mp4'
+        'video/webm'
       ];
       
       let selectedMimeType = '';
@@ -197,14 +195,19 @@ export default function LoginPage() {
         }
       }
       
-      // If no specific type is supported, let MediaRecorder use default
-      if (!selectedMimeType) {
-        console.log('No specific mimeType supported, using browser default');
+      // Create recorder with supported mimeType or default
+      let recorder: MediaRecorder;
+      try {
+        if (selectedMimeType) {
+          recorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+        } else {
+          recorder = new MediaRecorder(stream);
+          console.log('Using default mimeType:', recorder.mimeType);
+        }
+      } catch (error) {
+        console.error('Error creating MediaRecorder:', error);
+        return;
       }
-      
-      const recorder = selectedMimeType 
-        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
-        : new MediaRecorder(stream);
       
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -215,7 +218,7 @@ export default function LoginPage() {
       recorder.onstop = async () => {
         try {
           // Use the mimeType that MediaRecorder actually used
-          const actualMimeType = selectedMimeType || recorder.mimeType || 'video/webm';
+          const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
           setRecordedChunks(chunks);
           
@@ -245,32 +248,45 @@ export default function LoginPage() {
       recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
       
-      // Auto-progress through directions
+      // Auto-progress through all 4 directions
       setTimeout(() => {
-        const newCompleted = new Set(completedDirections);
-        newCompleted.add("left");
-        setCompletedDirections(newCompleted);
+        const completed1 = new Set(completedDirections);
+        completed1.add("left");
+        setCompletedDirections(completed1);
         setCurrentDirection("right");
         
-        // Complete after right direction
         setTimeout(() => {
-          const finalCompleted = new Set(newCompleted);
-          finalCompleted.add("right");
-          setCompletedDirections(finalCompleted);
-          setIsRecording(false);
+          const completed2 = new Set(completed1);
+          completed2.add("right");
+          setCompletedDirections(completed2);
+          setCurrentDirection("up");
           
-          // Stop recording
-          if (recorder.state !== 'inactive') {
-            recorder.stop();
-          }
-          
-          setCurrentStep("processing");
           setTimeout(() => {
-            if (stream) {
-              stream.getTracks().forEach(track => track.stop());
-            }
-            setCurrentStep("complete");
-          }, 3000);
+            const completed3 = new Set(completed2);
+            completed3.add("up");
+            setCompletedDirections(completed3);
+            setCurrentDirection("down");
+            
+            setTimeout(() => {
+              const completed4 = new Set(completed3);
+              completed4.add("down");
+              setCompletedDirections(completed4);
+              setIsRecording(false);
+              
+              // Stop recording
+              if (recorder.state !== 'inactive') {
+                recorder.stop();
+              }
+              
+              setCurrentStep("processing");
+              setTimeout(() => {
+                if (stream) {
+                  stream.getTracks().forEach(track => track.stop());
+                }
+                setCurrentStep("complete");
+              }, 3000);
+            }, 3000); // 3 seconds for down direction
+          }, 3000); // 3 seconds for up direction
         }, 3000); // 3 seconds for right direction
       }, 3000); // 3 seconds for left direction
     }
@@ -513,7 +529,7 @@ export default function LoginPage() {
             <div className="text-center">
               <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
               <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Center your face in the frame. You'll be asked to slowly turn your head left, then right.
+                Center your face in the frame. You'll be asked to slowly turn your head in all directions.
               </p>
 
               {/* Camera Preview */}
@@ -601,12 +617,18 @@ export default function LoginPage() {
                       <div
                         className="text-white font-bold text-5xl"
                         style={{
-                          transform: currentDirection === "left" ? "translateX(-90px)" : "translateX(90px)",
+                          transform: 
+                            currentDirection === "left" ? "translateX(-90px)" : 
+                            currentDirection === "right" ? "translateX(90px)" :
+                            currentDirection === "up" ? "translateY(-100px)" :
+                            "translateY(100px)",
                           textShadow: '0 0 20px rgba(0,0,0,0.9)',
                           transition: 'transform 0.5s ease'
                         }}
                       >
-                        {currentDirection === "left" ? "←" : "→"}
+                        {currentDirection === "left" ? "←" : 
+                         currentDirection === "right" ? "→" :
+                         currentDirection === "up" ? "↑" : "↓"}
                       </div>
                     </div>
                   )}
@@ -623,7 +645,7 @@ export default function LoginPage() {
 
               {/* Progress */}
               <div className="flex justify-center gap-3 mb-4">
-                {["left", "right"].map((dir) => (
+                {["left", "right", "up", "down"].map((dir) => (
                   <div
                     key={dir}
                     className="w-3 h-3 rounded-full transition-colors"
