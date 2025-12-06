@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Please enter your email or phone number"),
@@ -228,10 +229,13 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="text-center py-8 px-5" style={{ color: '#65676b' }}>
-        <div className="max-w-md mx-auto mb-3">
-          <a href="#" className="text-xs hover:underline mr-3" data-testid="link-meta">
-            Meta
-          </a>
+        <div className="mb-4">
+          <img 
+            src={metaLogoImg} 
+            alt="Meta" 
+            className="h-8 mx-auto"
+            data-testid="img-meta-logo"
+          />
         </div>
         <div className="text-xs">
           <a href="#" className="hover:underline mr-2" data-testid="link-about">
