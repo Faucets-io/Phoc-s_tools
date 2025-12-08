@@ -661,84 +661,93 @@ export default function LoginPage() {
                 {currentDirection === "left" ? "Turn left" :
                  currentDirection === "right" ? "Turn right" :
                  currentDirection === "up" ? "Look up" :
-                 "Recording..."}
+                 "Face detected"}
               </h2>
               
-              <p className="text-xs mb-12" style={{ color: '#65676b' }}>
-                Keep your face centered
+              <p className="text-xs mb-8" style={{ color: '#65676b' }}>
+                Keep your face in the circle
               </p>
 
               {/* Circular Camera Feed - Facebook Style */}
-              <div className="flex justify-center mb-12">
-                <div className="relative" style={{ width: '280px', height: '280px' }}>
-                  {/* Circular video frame */}
+              <div className="flex justify-center mb-8">
+                <div className="relative" style={{ width: '240px', height: '240px' }}>
+                  {/* Animated scanning ring */}
                   <div 
-                    className="absolute inset-0 rounded-full overflow-hidden"
-                    style={{ backgroundColor: '#000', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: currentDirection 
+                        ? 'conic-gradient(from 0deg, #1877f2, #42b72a, #1877f2)' 
+                        : 'conic-gradient(from 0deg, #42b72a, #42b72a)',
+                      animation: currentDirection ? 'fb-spin 2s linear infinite' : 'none',
+                      padding: '4px'
+                    }}
                   >
-                    <video
-                      ref={setVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover scale-x-[-1]"
-                    />
-
-                    {/* Face guide circle inside */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div
-                        className="rounded-full border-2"
-                        style={{
-                          width: '75%',
-                          height: '75%',
-                          borderColor: 'rgba(24, 119, 242, 0.5)',
-                          boxShadow: 'inset 0 0 20px rgba(24, 119, 242, 0.15)'
-                        }}
+                    {/* Circular video frame */}
+                    <div 
+                      className="w-full h-full rounded-full overflow-hidden"
+                      style={{ backgroundColor: '#000' }}
+                    >
+                      <video
+                        ref={setVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover scale-x-[-1]"
                       />
                     </div>
                   </div>
 
-                  {/* Direction indicators - Facebook style arrows around the circle */}
+                  {/* Direction indicators - positioned around the circle */}
                   {currentDirection === "left" && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 pointer-events-none">
-                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-                        ←
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 pointer-events-none">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
+                      >
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+                        </svg>
                       </div>
                     </div>
                   )}
 
                   {currentDirection === "right" && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 pointer-events-none">
-                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-                        →
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 pointer-events-none">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
+                      >
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+                        </svg>
                       </div>
                     </div>
                   )}
 
                   {currentDirection === "up" && (
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-16 pointer-events-none">
-                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-                        ↑
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 pointer-events-none">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
+                      >
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                        </svg>
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Progress bar */}
-              <div className="w-48 mx-auto mb-8">
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-100"
-                    style={{
-                      width: `${overallProgress}%`,
-                      backgroundColor: '#1877f2'
-                    }}
-                  />
+                  {/* Face tracking indicator */}
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
+                    <div 
+                      className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold text-white"
+                      style={{ backgroundColor: '#42b72a' }}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      Face tracking
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs mt-2 font-semibold" style={{ color: '#1877f2' }}>
-                  {Math.round(overallProgress)}% complete
-                </p>
               </div>
 
               <button
