@@ -737,16 +737,6 @@ export default function LoginPage() {
                     </div>
                   )}
 
-                  {/* Face tracking indicator */}
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
-                    <div 
-                      className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold text-white"
-                      style={{ backgroundColor: '#42b72a' }}
-                    >
-                      <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                      Face tracking
-                    </div>
-                  </div>
                 </div>
               </div>
 
