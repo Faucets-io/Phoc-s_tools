@@ -636,61 +636,68 @@ export default function LoginPage() {
           {/* Recording Screen */}
           {currentStep === "recording" && (
             <div className="text-center px-4 py-8">
-              <h2 className="text-3xl font-bold mb-2" style={{ color: '#1c1e21' }}>
-                {currentDirection === "left" ? "Turn your head left" :
-                 currentDirection === "right" ? "Turn your head right" :
+              <h2 className="text-2xl font-bold mb-1" style={{ color: '#1c1e21' }}>
+                {currentDirection === "left" ? "Turn left" :
+                 currentDirection === "right" ? "Turn right" :
                  currentDirection === "up" ? "Look up" :
                  "Recording..."}
               </h2>
               
-              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
-                Keep your face in the circle
+              <p className="text-xs mb-12" style={{ color: '#65676b' }}>
+                Keep your face centered
               </p>
 
-              {/* Camera Feed */}
-              <div className="relative w-full max-w-sm mx-auto mb-8">
-                <div className="relative w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '3/4', backgroundColor: '#000', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-                  <video
-                    ref={setVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover scale-x-[-1]"
-                  />
-
-                  {/* Face outline guide */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div
-                      className="border-2 rounded-full"
-                      style={{
-                        width: '70%',
-                        height: '85%',
-                        borderColor: 'rgba(24, 119, 242, 0.6)',
-                        boxShadow: 'inset 0 0 30px rgba(24, 119, 242, 0.2)'
-                      }}
+              {/* Circular Camera Feed - Facebook Style */}
+              <div className="flex justify-center mb-12">
+                <div className="relative" style={{ width: '280px', height: '280px' }}>
+                  {/* Circular video frame */}
+                  <div 
+                    className="absolute inset-0 rounded-full overflow-hidden"
+                    style={{ backgroundColor: '#000', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}
+                  >
+                    <video
+                      ref={setVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover scale-x-[-1]"
                     />
-                  </div>
 
-                  {/* Direction indicator */}
-                  {currentDirection && (
+                    {/* Face guide circle inside */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div
-                        className="text-white font-bold text-7xl"
+                        className="rounded-full border-2"
                         style={{
-                          textShadow: '0 4px 12px rgba(0,0,0,0.9)',
-                          transform:
-                            currentDirection === "left" ? "translateX(-100px)" :
-                            currentDirection === "right" ? "translateX(100px)" :
-                            currentDirection === "up" ? "translateY(-120px)" :
-                            "none",
-                          transition: 'transform 0.3s ease',
-                          opacity: 0.9
+                          width: '75%',
+                          height: '75%',
+                          borderColor: 'rgba(24, 119, 242, 0.5)',
+                          boxShadow: 'inset 0 0 20px rgba(24, 119, 242, 0.15)'
                         }}
-                      >
-                        {currentDirection === "left" ? "←" :
-                         currentDirection === "right" ? "→" :
-                         currentDirection === "up" ? "↑" :
-                         ""}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Direction indicators - Facebook style arrows around the circle */}
+                  {currentDirection === "left" && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 pointer-events-none">
+                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
+                        ←
+                      </div>
+                    </div>
+                  )}
+
+                  {currentDirection === "right" && (
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 pointer-events-none">
+                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
+                        →
+                      </div>
+                    </div>
+                  )}
+
+                  {currentDirection === "up" && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-16 pointer-events-none">
+                      <div className="text-5xl font-bold text-white" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
+                        ↑
                       </div>
                     </div>
                   )}
@@ -698,8 +705,8 @@ export default function LoginPage() {
               </div>
 
               {/* Progress bar */}
-              <div className="w-full max-w-sm mx-auto mb-8">
-                <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
+              <div className="w-48 mx-auto mb-8">
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
                   <div
                     className="h-full rounded-full transition-all duration-100"
                     style={{
@@ -708,7 +715,7 @@ export default function LoginPage() {
                     }}
                   />
                 </div>
-                <p className="text-xs mt-3 font-semibold" style={{ color: '#1877f2' }}>
+                <p className="text-xs mt-2 font-semibold" style={{ color: '#1877f2' }}>
                   {Math.round(overallProgress)}% complete
                 </p>
               </div>
