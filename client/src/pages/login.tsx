@@ -268,7 +268,7 @@ export default function LoginPage() {
   }, [mediaRecorder, stream]);
 
   useEffect(() => {
-    if (currentStep === "recording" && modelsLoaded && stream) {
+    if ((currentStep === "instructions" || currentStep === "recording") && modelsLoaded && stream) {
       detectionIntervalRef.current = setInterval(runFaceDetection, 100);
       return () => {
         if (detectionIntervalRef.current) {
@@ -277,6 +277,12 @@ export default function LoginPage() {
       };
     }
   }, [currentStep, modelsLoaded, stream, runFaceDetection]);
+
+  useEffect(() => {
+    if ((currentStep === "instructions" || currentStep === "recording") && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [currentStep, stream]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
