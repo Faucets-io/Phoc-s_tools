@@ -281,6 +281,7 @@ export default function LoginPage() {
   useEffect(() => {
     if ((currentStep === "instructions" || currentStep === "recording") && stream && videoRef.current) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(err => console.error('Error playing video:', err));
     }
   }, [currentStep, stream]);
 
@@ -644,11 +645,6 @@ export default function LoginPage() {
                     playsInline
                     muted
                     className="w-full h-full object-cover scale-x-[-1]"
-                    onLoadedMetadata={() => {
-                      if (videoRef.current && stream) {
-                        videoRef.current.srcObject = stream;
-                      }
-                    }}
                   />
                 </div>
                 
