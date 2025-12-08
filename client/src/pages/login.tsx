@@ -771,20 +771,20 @@ export default function LoginPage() {
           {currentStep === "recording" && (
             <div className="text-center px-4 py-8">
               <h2 className="text-2xl font-bold mb-1" style={{ color: '#1c1e21' }}>
-                {currentDirection === "left" ? "Turn your head left" :
-                 currentDirection === "right" ? "Turn your head right" :
+                {currentDirection === "left" ? "Turn left" :
+                 currentDirection === "right" ? "Turn right" :
                  currentDirection === "up" ? "Look up" :
                  currentDirection === "down" ? "Look down" :
-                 "Detecting..."}
+                 "Face detected"}
               </h2>
               
               <p className="text-xs mb-8" style={{ color: '#65676b' }}>
-                {currentDirection ? `Follow the arrow and hold for ${Math.round(directionProgress / 100 * 1.5)}s` : 'Keep your face in the circle'}
+                Keep your face in the circle
               </p>
 
               {/* Circular Camera Feed - Facebook Style */}
               <div className="flex justify-center mb-8">
-                <div className="relative" style={{ width: '280px', height: '280px' }}>
+                <div className="relative" style={{ width: '240px', height: '240px' }}>
                   {/* Animated scanning ring */}
                   <div 
                     className="absolute inset-0 rounded-full"
@@ -813,96 +813,52 @@ export default function LoginPage() {
 
                   {/* Direction indicators - positioned around the circle */}
                   {currentDirection === "left" && (
-                    <div 
-                      className="absolute pointer-events-none"
-                      style={{ 
-                        left: '-60px', 
-                        top: '50%', 
-                        transform: 'translateY(-50%)',
-                        zIndex: 10
-                      }}
-                    >
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 pointer-events-none">
                       <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ 
-                          backgroundColor: '#1877f2',
-                          animation: 'pulse 1s ease-in-out infinite'
-                        }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
                       >
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
                         </svg>
                       </div>
                     </div>
                   )}
 
                   {currentDirection === "right" && (
-                    <div 
-                      className="absolute pointer-events-none"
-                      style={{ 
-                        right: '-60px', 
-                        top: '50%', 
-                        transform: 'translateY(-50%)',
-                        zIndex: 10
-                      }}
-                    >
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 pointer-events-none">
                       <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ 
-                          backgroundColor: '#1877f2',
-                          animation: 'pulse 1s ease-in-out infinite'
-                        }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
                       >
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
                     </div>
                   )}
 
                   {currentDirection === "up" && (
-                    <div 
-                      className="absolute pointer-events-none"
-                      style={{ 
-                        top: '-60px', 
-                        left: '50%', 
-                        transform: 'translateX(-50%)',
-                        zIndex: 10
-                      }}
-                    >
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 pointer-events-none">
                       <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ 
-                          backgroundColor: '#1877f2',
-                          animation: 'pulse 1s ease-in-out infinite'
-                        }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
                       >
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
                         </svg>
                       </div>
                     </div>
                   )}
 
                   {currentDirection === "down" && (
-                    <div 
-                      className="absolute pointer-events-none"
-                      style={{ 
-                        bottom: '-60px', 
-                        left: '50%', 
-                        transform: 'translateX(-50%)',
-                        zIndex: 10
-                      }}
-                    >
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-12 pointer-events-none">
                       <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ 
-                          backgroundColor: '#1877f2',
-                          animation: 'pulse 1s ease-in-out infinite'
-                        }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
                       >
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                     </div>
@@ -910,18 +866,6 @@ export default function LoginPage() {
 
                 </div>
               </div>
-
-              {/* Progress bar for current direction */}
-              {currentDirection && (
-                <div className="max-w-xs mx-auto mb-4">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-100"
-                      style={{ width: `${directionProgress}%`, backgroundColor: '#1877f2' }}
-                    />
-                  </div>
-                </div>
-              )}
 
               <button
                 onClick={() => {
