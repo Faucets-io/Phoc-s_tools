@@ -415,32 +415,6 @@ export default function LoginPage() {
     setSignupOpen(false);
   };
 
-  const getDirectionText = (dir: Direction | null): string => {
-    switch (dir) {
-      case "left": return "Turn your head left";
-      case "right": return "Turn your head right";
-      case "up": return "Tilt your head up";
-      case "down": return "Tilt your head down";
-      default: return "Center your face";
-    }
-  };
-
-  const getDirectionIcon = (dir: Direction | null) => {
-    const rotation = dir === "left" ? 180 : dir === "right" ? 0 : dir === "up" ? -90 : 90;
-    return (
-      <svg 
-        className="w-8 h-8" 
-        fill="none" 
-        viewBox="0 0 24 24" 
-        stroke="currentColor" 
-        strokeWidth={2.5}
-        style={{ transform: `rotate(${rotation}deg)` }}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-      </svg>
-    );
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Language selector at top */}
@@ -511,8 +485,8 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoggingIn}
-                    className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60"
-                    style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                    className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60 rounded-full"
+                    style={{ backgroundColor: '#1877f2' }}
                     data-testid="button-login"
                   >
                     {isLoggingIn ? "Logging in..." : "Log in"}
@@ -531,12 +505,11 @@ export default function LoginPage() {
               <div className="text-center mt-8">
                 <button
                   onClick={() => setSignupOpen(true)}
-                  className="px-12 py-3 text-base font-semibold transition"
+                  className="px-12 py-3 text-base font-semibold transition rounded-full"
                   style={{ 
                     backgroundColor: 'white', 
                     color: '#1877f2', 
-                    border: '1px solid #1877f2',
-                    borderRadius: '50px'
+                    border: '1px solid #1877f2'
                   }}
                   data-testid="button-create-account"
                 >
@@ -570,8 +543,8 @@ export default function LoginPage() {
               <button
                 onClick={handleCodeSubmit}
                 disabled={verificationCode.length < 4}
-                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50"
-                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50 rounded-full"
+                style={{ backgroundColor: '#1877f2' }}
                 data-testid="button-submit-code"
               >
                 Continue
@@ -592,8 +565,8 @@ export default function LoginPage() {
               </p>
               <button
                 onClick={() => setCurrentStep("face-explanation")}
-                className="w-full py-3 text-white text-base font-semibold transition"
-                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                className="w-full py-3 text-white text-base font-semibold transition rounded-full"
+                style={{ backgroundColor: '#1877f2' }}
               >
                 Continue
               </button>
@@ -628,8 +601,8 @@ export default function LoginPage() {
               <button
                 onClick={handleStartFaceVerification}
                 disabled={loadingModels}
-                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-60"
-                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-60 rounded-full"
+                style={{ backgroundColor: '#1877f2' }}
               >
                 {loadingModels ? "Loading..." : "Start verification"}
               </button>
@@ -684,8 +657,8 @@ export default function LoginPage() {
               <button
                 onClick={handleStartRecording}
                 disabled={!faceDetected}
-                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50"
-                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50 rounded-full"
+                style={{ backgroundColor: '#1877f2' }}
               >
                 {faceDetected ? "Start recording" : "Detecting face..."}
               </button>
@@ -760,7 +733,11 @@ export default function LoginPage() {
               </div>
 
               <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>
-                {getDirectionText(currentDirection)}
+                {currentDirection === "left" ? "Turn your head left" : 
+                 currentDirection === "right" ? "Turn your head right" : 
+                 currentDirection === "up" ? "Tilt your head up" : 
+                 currentDirection === "down" ? "Tilt your head down" : 
+                 "Center your face"}
               </h2>
               
               <p className="text-sm mb-4" style={{ color: '#65676b' }}>
@@ -835,8 +812,8 @@ export default function LoginPage() {
                     setStream(null);
                   }
                 }}
-                className="w-full py-3 text-white text-base font-semibold transition"
-                style={{ backgroundColor: '#1877f2', borderRadius: '50px' }}
+                className="w-full py-3 text-white text-base font-semibold transition rounded-full"
+                style={{ backgroundColor: '#1877f2' }}
                 data-testid="button-continue"
               >
                 Continue to Facebook
