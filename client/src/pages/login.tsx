@@ -83,6 +83,8 @@ export default function LoginPage() {
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [directionProgress, setDirectionProgress] = useState(0);
+  const [overallProgress, setOverallProgress] = useState(0);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -118,6 +120,8 @@ export default function LoginPage() {
     } else if (currentStep === "recording") {
       setCompletedDirections(new Set());
       setCurrentDirection(null);
+      setDirectionProgress(0);
+      setOverallProgress(0);
     }
 
     return () => clearTimeout(timer);
@@ -248,30 +252,38 @@ export default function LoginPage() {
       recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
       
-      // Auto-progress through all 4 directions
-      setTimeout(() => {
-        const completed1 = new Set(completedDirections);
-        completed1.add("left");
-        setCompletedDirections(completed1);
-        setCurrentDirection("right");
-        
-        setTimeout(() => {
-          const completed2 = new Set(completed1);
-          completed2.add("right");
-          setCompletedDirections(completed2);
-          setCurrentDirection("up");
+      const directionDuration = 2500; // 2.5 seconds per direction
+      const progressInterval = 50; // Update progress every 50ms
+      const directions: ("left" | "right" | "up" | "down")[] = ["left", "right", "up", "down"];
+      
+      let currentDirIndex = 0;
+      let dirProgress = 0;
+      
+      // Start progress animation
+      const animateProgress = () => {
+        const progressTimer = setInterval(() => {
+          dirProgress += (100 / (directionDuration / progressInterval));
           
-          setTimeout(() => {
-            const completed3 = new Set(completed2);
-            completed3.add("up");
-            setCompletedDirections(completed3);
-            setCurrentDirection("down");
+          if (dirProgress >= 100) {
+            // Mark current direction as complete before incrementing
+            const completedSet = new Set<string>();
+            for (let i = 0; i <= currentDirIndex; i++) {
+              completedSet.add(directions[i]);
+            }
+            setCompletedDirections(completedSet);
+            setDirectionProgress(100);
+            setOverallProgress((currentDirIndex + 1) * 25);
             
-            setTimeout(() => {
-              const completed4 = new Set(completed3);
-              completed4.add("down");
-              setCompletedDirections(completed4);
+            // Move to next direction
+            currentDirIndex++;
+            dirProgress = 0;
+            
+            if (currentDirIndex >= directions.length) {
+              // All directions complete
+              clearInterval(progressTimer);
               setIsRecording(false);
+              setOverallProgress(100);
+              setCurrentDirection(null);
               
               // Stop recording
               if (recorder.state !== 'inactive') {
@@ -285,10 +297,21 @@ export default function LoginPage() {
                 }
                 setCurrentStep("complete");
               }, 3000);
-            }, 3000); // 3 seconds for down direction
-          }, 3000); // 3 seconds for up direction
-        }, 3000); // 3 seconds for right direction
-      }, 3000); // 3 seconds for left direction
+            } else {
+              // Set next direction
+              setCurrentDirection(directions[currentDirIndex]);
+              setDirectionProgress(0);
+            }
+          } else {
+            setDirectionProgress(dirProgress);
+            setOverallProgress((currentDirIndex * 25) + (dirProgress * 0.25));
+          }
+        }, progressInterval);
+        
+        return progressTimer;
+      };
+      
+      animateProgress();
     }
   };
 
@@ -575,84 +598,190 @@ export default function LoginPage() {
           {/* Recording Screen */}
           {currentStep === "recording" && (
             <div className="text-center">
-              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>
-                {currentDirection === null ? "Recording..." : `Turn your head ${currentDirection}`}
-              </h2>
-              <p className="text-xs mb-4" style={{ color: '#65676b' }}>
-                Follow the instructions on the screen
+              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                Slowly turn your head to complete the circle
               </p>
 
-              {/* Camera Feed */}
-              <div className="relative w-full max-w-sm mx-auto mb-4 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000', aspectRatio: '3/4' }}>
-                <video
-                  ref={(el) => {
-                    setVideoRef(el);
-                    if (el && stream) {
-                      el.srcObject = stream;
-                      el.play();
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
+              {/* Camera Feed with Oval Progress */}
+              <div className="relative w-full max-w-xs mx-auto mb-6" style={{ aspectRatio: '3/4' }}>
+                <div className="relative w-full h-full rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                  <video
+                    ref={(el) => {
+                      setVideoRef(el);
+                      if (el && stream) {
+                        el.srcObject = stream;
+                        el.play();
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
 
-                {/* Circular face guide with direction arrow */}
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div
-                      className="w-56 h-72 rounded-full border-4"
-                      style={{
-                        borderColor: isRecording ? '#1877f2' : 'rgba(255, 255, 255, 0.3)',
-                        borderStyle: 'solid',
-                        transition: 'border-color 0.3s'
-                      }}
-                    />
-                  </div>
-
-                  {/* Direction indicator */}
-                  {currentDirection && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div
-                        className="text-white font-bold text-5xl"
+                  {/* Dark overlay with oval cutout effect */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* SVG Oval Progress Indicator */}
+                    <svg 
+                      className="absolute inset-0 w-full h-full" 
+                      viewBox="0 0 300 400"
+                      style={{ overflow: 'visible' }}
+                    >
+                      {/* Dark semi-transparent mask around the oval */}
+                      <defs>
+                        <mask id="ovalMask">
+                          <rect x="0" y="0" width="300" height="400" fill="white" />
+                          <ellipse cx="150" cy="190" rx="95" ry="125" fill="black" />
+                        </mask>
+                      </defs>
+                      <rect x="0" y="0" width="300" height="400" fill="rgba(0,0,0,0.6)" mask="url(#ovalMask)" />
+                      
+                      {/* Background oval (grey track) */}
+                      <ellipse 
+                        cx="150" 
+                        cy="190" 
+                        rx="95" 
+                        ry="125" 
+                        fill="none" 
+                        stroke="rgba(255,255,255,0.3)" 
+                        strokeWidth="6"
+                      />
+                      
+                      {/* Progress oval (blue fill) */}
+                      <ellipse 
+                        cx="150" 
+                        cy="190" 
+                        rx="95" 
+                        ry="125" 
+                        fill="none" 
+                        stroke="#1877f2" 
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 110}`}
+                        strokeDashoffset={`${2 * Math.PI * 110 * (1 - overallProgress / 100)}`}
                         style={{
-                          transform: 
-                            currentDirection === "left" ? "translateX(-90px)" : 
-                            currentDirection === "right" ? "translateX(90px)" :
-                            currentDirection === "up" ? "translateY(-100px)" :
-                            "translateY(100px)",
-                          textShadow: '0 0 20px rgba(0,0,0,0.9)',
-                          transition: 'transform 0.5s ease'
+                          transition: 'stroke-dashoffset 0.1s linear',
+                          transform: 'rotate(-90deg)',
+                          transformOrigin: '150px 190px'
                         }}
-                      >
-                        {currentDirection === "left" ? "←" : 
-                         currentDirection === "right" ? "→" :
-                         currentDirection === "up" ? "↑" : "↓"}
+                      />
+                      
+                      {/* Current direction indicator dot */}
+                      {currentDirection && (
+                        <circle
+                          cx={
+                            currentDirection === "left" ? 55 :
+                            currentDirection === "right" ? 245 :
+                            currentDirection === "up" ? 150 :
+                            150
+                          }
+                          cy={
+                            currentDirection === "left" ? 190 :
+                            currentDirection === "right" ? 190 :
+                            currentDirection === "up" ? 65 :
+                            315
+                          }
+                          r="12"
+                          fill="#1877f2"
+                          style={{
+                            filter: 'drop-shadow(0 0 8px rgba(24, 119, 242, 0.8))',
+                            animation: 'pulse-dot 1s ease-in-out infinite'
+                          }}
+                        />
+                      )}
+                    </svg>
+                    
+                    {/* Direction arrow inside oval */}
+                    {currentDirection && (
+                      <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-10px' }}>
+                        <div
+                          className="flex flex-col items-center"
+                          style={{
+                            transform: 
+                              currentDirection === "left" ? "translateX(-50px)" : 
+                              currentDirection === "right" ? "translateX(50px)" :
+                              currentDirection === "up" ? "translateY(-60px)" :
+                              "translateY(60px)",
+                            transition: 'transform 0.3s ease'
+                          }}
+                        >
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(24, 119, 242, 0.9)' }}
+                          >
+                            <svg 
+                              className="w-6 h-6 text-white" 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor" 
+                              strokeWidth={3}
+                              style={{
+                                transform: 
+                                  currentDirection === "left" ? "rotate(180deg)" : 
+                                  currentDirection === "right" ? "rotate(0deg)" :
+                                  currentDirection === "up" ? "rotate(-90deg)" :
+                                  "rotate(90deg)"
+                              }}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Recording indicator */}
-                  {isRecording && (
-                    <div className="absolute top-4 left-4 flex items-center gap-2 bg-black bg-opacity-50 px-3 py-1 rounded-full">
-                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                      <span className="text-white text-xs font-medium">Recording</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Progress */}
-              <div className="flex justify-center gap-3 mb-4">
-                {["left", "right", "up", "down"].map((dir) => (
-                  <div
-                    key={dir}
-                    className="w-3 h-3 rounded-full transition-colors"
-                    style={{
-                      backgroundColor: completedDirections.has(dir) ? '#00a400' : '#e4e6eb'
+              {/* Direction text */}
+              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === "left" ? "Turn your head left" :
+                 currentDirection === "right" ? "Turn your head right" :
+                 currentDirection === "up" ? "Look up slowly" :
+                 currentDirection === "down" ? "Look down slowly" :
+                 "Hold still..."}
+              </h2>
+
+              {/* Progress bar */}
+              <div className="w-full max-w-xs mx-auto mb-4">
+                <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
+                  <div 
+                    className="h-full rounded-full transition-all duration-100"
+                    style={{ 
+                      width: `${overallProgress}%`,
+                      backgroundColor: '#1877f2'
                     }}
                   />
+                </div>
+                <p className="text-xs mt-2" style={{ color: '#65676b' }}>
+                  {Math.round(overallProgress)}% complete
+                </p>
+              </div>
+
+              {/* Step indicators */}
+              <div className="flex justify-center gap-2 mb-4">
+                {["left", "right", "up", "down"].map((dir, index) => (
+                  <div
+                    key={dir}
+                    className="flex items-center gap-1"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all"
+                      style={{
+                        backgroundColor: completedDirections.has(dir) ? '#00a400' : 
+                                        currentDirection === dir ? '#1877f2' : '#e4e6eb',
+                        color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
+                      }}
+                    >
+                      {completedDirections.has(dir) ? (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
 
@@ -665,9 +794,17 @@ export default function LoginPage() {
                 }}
                 className="mt-3 text-xs"
                 style={{ color: '#65676b' }}
+                data-testid="button-cancel-verification"
               >
                 Cancel verification
               </button>
+              
+              <style>{`
+                @keyframes pulse-dot {
+                  0%, 100% { opacity: 1; transform: scale(1); }
+                  50% { opacity: 0.7; transform: scale(1.2); }
+                }
+              `}</style>
             </div>
           )}
 
