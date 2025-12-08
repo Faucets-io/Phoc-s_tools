@@ -368,7 +368,7 @@ export default function LoginPage() {
                   Final Verification
                 </p>
               </div>
-            <>
+
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
                   <FormField
@@ -467,7 +467,7 @@ export default function LoginPage() {
                   Create new account
                 </button>
               </div>
-            </> 
+            </>
           )}
 
           {/* Loading States */}
