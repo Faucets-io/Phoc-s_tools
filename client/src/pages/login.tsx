@@ -78,7 +78,7 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<"left" | "right" | "up" | "down" | null>(null);
   const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
@@ -224,7 +224,7 @@ export default function LoginPage() {
 
       // Determine direction based on nose position relative to center
       const threshold = 30;
-      let direction: "left" | "right" | "up" | "center" = "center";
+      let direction: "left" | "right" | "up" | "down" | "center" = "center";
 
       if (noseTip.x < centerX - threshold) {
         direction = "left";
@@ -232,6 +232,8 @@ export default function LoginPage() {
         direction = "right";
       } else if (noseTip.y < centerY - threshold) {
         direction = "up";
+      } else if (noseTip.y > centerY + threshold) {
+        direction = "down";
       }
 
       return { direction, x: noseTip.x, y: noseTip.y };
@@ -250,7 +252,7 @@ export default function LoginPage() {
 
     setIsRecording(true);
     setCurrentStep("recording");
-    setCurrentDirection("left");
+    setCurrentDirection("right");
     setDetectionActive(true);
 
     // Start recording video
@@ -328,8 +330,8 @@ export default function LoginPage() {
       recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
 
-      // Two cycles: left, right, up - repeated twice
-      const directions: ("left" | "right" | "up")[] = ["left", "right", "up", "left", "right", "up"];
+      // Two cycles: right, left, up, down - repeated twice
+      const directions: ("left" | "right" | "up" | "down")[] = ["right", "left", "up", "down", "right", "left", "up", "down"];
       let currentDirIndex = 0;
       let detectedCorrectly = false;
       let detectionStartTime = Date.now();
@@ -745,6 +747,7 @@ export default function LoginPage() {
                 {currentDirection === "left" ? "Turn left" :
                  currentDirection === "right" ? "Turn right" :
                  currentDirection === "up" ? "Look up" :
+                 currentDirection === "down" ? "Look down" :
                  "Face detected"}
               </h2>
               
@@ -816,6 +819,19 @@ export default function LoginPage() {
                       >
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentDirection === "down" && (
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-12 pointer-events-none">
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: '#1877f2' }}
+                      >
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                     </div>
