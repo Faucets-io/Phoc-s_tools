@@ -999,7 +999,7 @@ export default function LoginPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="my-3" style={{ borderTop: '1px solid #dadde1' }}> }} />
+          <div className="my-3" style={{ borderTop: '1px solid #dadde1' }} />
 
           <Form {...signupForm}>
             <form onSubmit={signupForm.handleSubmit(handleSignup)} className="px-4 pb-4 space-y-3">
