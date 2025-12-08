@@ -2,8 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - Facebook Design System */
-:root {
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@layer base {
+  :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8;
@@ -43,9 +54,6 @@
   --chart-3: 200 65% 40%;
   --chart-4: 190 60% 38%;
   --chart-5: 180 55% 36%;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
   --fb-blue: 214 89% 52%;
   --fb-green: 141 53% 53%;
   --radius: .5rem;
