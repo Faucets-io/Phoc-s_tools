@@ -204,12 +204,14 @@ export default function LoginPage() {
 
   const detectFaceDirection = async (video: HTMLVideoElement) => {
     if (!faceDetector || !video) {
+      console.warn('Missing detector or video:', { hasDetector: !!faceDetector, hasVideo: !!video });
       return null;
     }
 
     try {
       const faces = await faceDetector.estimateFaces(video, { flipHorizontal: false });
       if (faces.length === 0) {
+        console.warn('No faces detected');
         return null;
       }
 
