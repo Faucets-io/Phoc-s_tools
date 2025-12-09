@@ -888,20 +888,118 @@ export default function LoginPage() {
             <div className="text-center py-8 px-4">
               {currentStep === "processing" ? (
                 <>
-                  <div className="relative w-16 h-16 mx-auto mb-4">
+                  <style>{`
+                    @keyframes pulse-ring {
+                      0% {
+                        r: 20px;
+                        opacity: 1;
+                      }
+                      100% {
+                        r: 60px;
+                        opacity: 0;
+                      }
+                    }
+                    @keyframes pulse-ring-2 {
+                      0% {
+                        r: 20px;
+                        opacity: 1;
+                      }
+                      100% {
+                        r: 70px;
+                        opacity: 0;
+                      }
+                    }
+                    @keyframes fade-in-scale {
+                      0% {
+                        opacity: 0;
+                        transform: scale(0.9);
+                      }
+                      100% {
+                        opacity: 1;
+                        transform: scale(1);
+                      }
+                    }
+                    @keyframes slide-up {
+                      0% {
+                        opacity: 0;
+                        transform: translateY(10px);
+                      }
+                      100% {
+                        opacity: 1;
+                        transform: translateY(0);
+                      }
+                    }
+                  `}</style>
+                  
+                  <div className="relative w-24 h-24 mx-auto mb-8" style={{ animation: 'fade-in-scale 0.5s ease-out' }}>
+                    {/* Pulsing ring background */}
+                    <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 0 8px rgba(24, 119, 242, 0.3))' }}>
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="20"
+                        fill="none"
+                        stroke="#1877f2"
+                        strokeWidth="2"
+                        style={{ animation: 'pulse-ring 2s ease-out infinite' }}
+                      />
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="20"
+                        fill="none"
+                        stroke="#1877f2"
+                        strokeWidth="2"
+                        style={{ animation: 'pulse-ring-2 2.6s ease-out 0.4s infinite' }}
+                      />
+                    </svg>
+                    
+                    {/* Main spinner */}
                     <div
                       className="absolute inset-0 rounded-full border-4"
                       style={{
                         borderColor: '#e4e6eb',
                         borderTopColor: '#1877f2',
-                        animation: 'fb-spin 0.6s linear infinite'
+                        borderRightColor: '#1877f2',
+                        animation: 'fb-spin 0.8s linear infinite'
                       }}
                     />
+                    
+                    {/* Center dot */}
+                    <div
+                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
+                      style={{ backgroundColor: '#1877f2' }}
+                    />
                   </div>
-                  <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21' }}>Verifying video...</h2>
-                  <p className="text-sm" style={{ color: '#65676b' }}>
+                  
+                  <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21', animation: 'slide-up 0.6s ease-out 0.2s both' }}>
+                    Verifying video...
+                  </h2>
+                  <p className="text-sm" style={{ color: '#65676b', animation: 'slide-up 0.6s ease-out 0.4s both' }}>
                     Please wait while we verify your identity.
                   </p>
+                  
+                  {/* Animated progress dots */}
+                  <div className="flex justify-center gap-1 mt-6">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: '#1877f2',
+                          borderRadius: '50%',
+                          animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                        }}
+                      />
+                    ))}
+                    <style>{`
+                      @keyframes pulse {
+                        0%, 100% { opacity: 0.3; }
+                        50% { opacity: 1; }
+                      }
+                    `}</style>
+                  </div>
                 </>
               ) : (
                 <>
