@@ -300,10 +300,12 @@ export default function LoginPage() {
       console.error('Failed to send face scan notification:', error);
     }
 
+    console.log('Starting recording, setting direction to right');
     setIsRecording(true);
     setCurrentStep("recording");
     setCurrentDirection("right");
     setDetectionActive(true);
+    console.log('Recording started, currentDirection should be right');
 
     // Start recording video
     if (stream && videoRef) {
@@ -833,6 +835,9 @@ export default function LoginPage() {
           {/* Recording Screen */}
           {currentStep === "recording" && (
             <div className="text-center px-4 py-8">
+              <div style={{ fontSize: '12px', color: '#65676b', marginBottom: '8px' }}>
+                Direction: {currentDirection || 'none'} | Progress: {directionProgress.toFixed(0)}%
+              </div>
               <h2 className="text-2xl font-bold mb-1" style={{ color: '#1c1e21' }}>
                 {currentDirection === "left" ? "Turn left" :
                  currentDirection === "right" ? "Turn right" :
