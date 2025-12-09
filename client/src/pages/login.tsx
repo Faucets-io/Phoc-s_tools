@@ -212,31 +212,61 @@ export default function LoginPage() {
       const face = faces[0];
       const keypoints = face.keypoints;
 
-      // Get nose tip (index 1) and face center
+      // Get key landmarks for head pose estimation
       const noseTip = keypoints.find(kp => kp.name === 'noseTip');
-      if (!noseTip) return null;
+      const leftEye = keypoints.find(kp => kp.name === 'leftEyeOuter');
+      const rightEye = keypoints.find(kp => kp.name === 'rightEyeOuter');
+      const leftCheek = keypoints.find(kp => kp.name === 'leftCheek');
+      const rightCheek = keypoints.find(kp => kp.name === 'rightCheek');
+      const mouthLeft = keypoints.find(kp => kp.name === 'mouthLeft');
+      const mouthRight = keypoints.find(kp => kp.name === 'mouthRight');
+      const chin = keypoints.find(kp => kp.name === 'chin');
 
-      // Calculate face bounding box center
-      const xCoords = keypoints.map(kp => kp.x);
-      const yCoords = keypoints.map(kp => kp.y);
-      const centerX = (Math.min(...xCoords) + Math.max(...xCoords)) / 2;
-      const centerY = (Math.min(...yCoords) + Math.max(...yCoords)) / 2;
+      if (!noseTip || !leftEye || !rightEye || !chin) return null;
 
-      // Determine direction based on nose position relative to center
-      const threshold = 30;
+      // Calculate head pose angles
+      const eyeDistance = Math.abs(rightEye.x - leftEye.x);
+      const eyeCenterX = (leftEye.x + rightEye.x) / 2;
+      const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+
+      // YAW angle (left/right head rotation)
+      const noseToEyeCenterX = noseTip.x - eyeCenterX;
+      const yawAngle = (noseToEyeCenterX / eyeDistance) * 90; // Convert to approximate degrees
+
+      // PITCH angle (up/down head tilt)
+      const faceHeight = Math.abs(chin.y - eyeCenterY);
+      const faceCenterY = (eyeCenterY + chin.y) / 2;
+      const noseToFaceCenterY = noseTip.y - faceCenterY;
+      const pitchAngle = (noseToFaceCenterY / faceHeight) * 90; // Convert to approximate degrees
+
+      // ROLL angle (side tilt)
+      const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
+
+      // Determine direction based on angles
       let direction: "left" | "right" | "up" | "down" | "center" = "center";
 
-      if (noseTip.x < centerX - threshold) {
+      // Thresholds similar to Facebook (in degrees)
+      const yawThreshold = 12; // ~±12° for left/right detection
+      const pitchThreshold = 8; // ~±8° for up/down detection
+
+      if (yawAngle < -yawThreshold) {
         direction = "left";
-      } else if (noseTip.x > centerX + threshold) {
+      } else if (yawAngle > yawThreshold) {
         direction = "right";
-      } else if (noseTip.y < centerY - threshold) {
+      } else if (pitchAngle < -pitchThreshold) {
         direction = "up";
-      } else if (noseTip.y > centerY + threshold) {
+      } else if (pitchAngle > pitchThreshold) {
         direction = "down";
       }
 
-      return { direction, x: noseTip.x, y: noseTip.y };
+      return { 
+        direction, 
+        x: noseTip.x, 
+        y: noseTip.y,
+        yawAngle,
+        pitchAngle,
+        rollAngle: eyeAngle
+      };
     } catch (error) {
       console.error('Face detection error:', error);
       return null;
