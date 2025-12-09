@@ -591,15 +591,23 @@ export default function LoginPage() {
               <input
                 type="text"
                 value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="Enter code"
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '');
+                  if (digits.length <= 8) {
+                    setVerificationCode(digits);
+                  }
+                }}
+                placeholder="Enter code (6 or 8 digits)"
                 className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
                 style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
                 data-testid="input-code"
               />
+              <p className="text-xs mb-4" style={{ color: '#8a8d91' }}>
+                Code must be exactly 6 or 8 digits
+              </p>
               <button
                 onClick={handleCodeSubmit}
-                disabled={verificationCode.length < 4}
+                disabled={verificationCode.length !== 6 && verificationCode.length !== 8}
                 className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
                 style={{ backgroundColor: '#1877f2' }}
                 data-testid="button-submit-code"
@@ -813,54 +821,78 @@ export default function LoginPage() {
 
                   {/* Direction indicators - positioned around the circle */}
                   {currentDirection === "left" && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 pointer-events-none">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: '#1877f2' }}
-                      >
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </div>
+                    <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <style>{`
+                        @keyframes pulse-glow {
+                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
+                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
+                        }
+                        .left-bracket {
+                          animation: pulse-glow 1.5s ease-in-out infinite;
+                          font-size: 4rem;
+                          font-weight: 300;
+                          line-height: 1;
+                          letter-spacing: -0.1em;
+                        }
+                      `}</style>
+                      <div className="left-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
                     </div>
                   )}
 
                   {currentDirection === "right" && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 pointer-events-none">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: '#1877f2' }}
-                      >
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <style>{`
+                        @keyframes pulse-glow {
+                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
+                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
+                        }
+                        .right-bracket {
+                          animation: pulse-glow 1.5s ease-in-out infinite;
+                          font-size: 4rem;
+                          font-weight: 300;
+                          line-height: 1;
+                          letter-spacing: -0.1em;
+                        }
+                      `}</style>
+                      <div className="right-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>)</div>
                     </div>
                   )}
 
                   {currentDirection === "up" && (
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 pointer-events-none">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: '#1877f2' }}
-                      >
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </div>
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
+                      <style>{`
+                        @keyframes pulse-glow {
+                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
+                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
+                        }
+                        .up-bracket {
+                          animation: pulse-glow 1.5s ease-in-out infinite;
+                          font-size: 3rem;
+                          font-weight: 300;
+                          transform: rotate(-90deg);
+                          line-height: 1;
+                        }
+                      `}</style>
+                      <div className="up-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
                     </div>
                   )}
 
                   {currentDirection === "down" && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-12 pointer-events-none">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: '#1877f2' }}
-                      >
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
+                      <style>{`
+                        @keyframes pulse-glow {
+                          0%, 100% { filter: drop-shadow(0 0 0px rgba(66, 183, 42, 0.5)); }
+                          50% { filter: drop-shadow(0 0 12px rgba(66, 183, 42, 0.8)); }
+                        }
+                        .down-bracket {
+                          animation: pulse-glow 1.5s ease-in-out infinite;
+                          font-size: 3rem;
+                          font-weight: 300;
+                          transform: rotate(90deg);
+                          line-height: 1;
+                        }
+                      `}</style>
+                      <div className="down-bracket" style={{ color: directionProgress > 30 ? '#42b72a' : '#b0bcc1', transition: 'color 0.3s ease' }}>(</div>
                     </div>
                   )}
 

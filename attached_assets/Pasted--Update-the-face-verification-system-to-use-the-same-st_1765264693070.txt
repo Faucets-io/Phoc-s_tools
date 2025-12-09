@@ -1,0 +1,65 @@
+
+
+Update the face-verification system to use the same style of movement indicators that Facebook uses during identity verification.
+
+1. Indicator Style Requirements (Match Facebook)
+	•	Use a curved bracket style indicator similar to Facebook’s
+	•	It should look like a soft curved arrow/parenthesis
+	•	Left indicator looks like this → (
+	•	Right indicator looks like this → )
+	•	The indicator must appear inside the camera frame, not outside
+	•	Use smooth, modern animations like Facebook’s
+	•	Indicator should gently pulse or glow to guide the user
+	•	As the user turns, the indicator should slowly turn green (same as Facebook)
+
+2. Behavior Requirements (Match Facebook Flow)
+
+A. Left Turn
+	•	Show the LEFT indicator (
+	•	Instruction: “Turn your head to the left”
+	•	As the user begins turning, the indicator starts changing color
+	•	When the yaw angle reaches the required threshold (≈ –15°),
+	•	The indicator becomes fully green
+	•	A smooth “success” animation is shown (same style as Facebook)
+
+B. Return to Center
+	•	Indicator disappears
+	•	Show “Return to center”
+	•	Wait until yaw is between –5° and +5°
+
+C. Right Turn
+	•	Show the RIGHT indicator )
+	•	Same color transition and animation style as Facebook
+
+D. Complete
+	•	When both directions are completed, show a Facebook-style ‘Liveness Complete’ animation
+	•	Then proceed to face capture & verification
+
+3. Technical Requirements
+
+Use only free, open-source tools:
+	•	MediaPipe Face Mesh (for head pose detection)
+	•	OpenCV (for camera + drawing overlays)
+	•	face_recognition (dlib) for verification
+
+Use MediaPipe to determine:
+	•	Yaw angle (left/right)
+	•	Trigger indicators exactly like Facebook does.
+
+4. Design Specification
+
+The indicator should match Facebook’s:
+	•	Shape (curved parenthesis-like bracket)
+	•	Positioning (left/right edges of the face frame)
+	•	Color behavior (grey → light green → full green)
+	•	Smooth easing animation
+	•	Subtle pulsing or breathing glow
+	•	Visual clarity and simplicity
+	•	Thickness and radius similar to Facebook’s bracket indicators
+
+5. Deliverables
+	•	Updated face-verification module
+	•	Fully functioning Facebook-style left/right indicators
+	•	Animation and color transition matching Facebook’s aesthetic
+	•	Clean integration into current app
+	•	Function name: runFacebookStyleFaceVerification()
