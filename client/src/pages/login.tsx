@@ -203,28 +203,33 @@ export default function LoginPage() {
   };
 
   const detectFaceDirection = async (video: HTMLVideoElement) => {
-    if (!faceDetector || !video) return null;
+    if (!faceDetector || !video) {
+      console.warn('Face detector or video not ready');
+      return null;
+    }
 
     try {
-      const faces = await faceDetector.estimateFaces(video);
-      if (faces.length === 0) return null;
+      const faces = await faceDetector.estimateFaces(video, { flipHorizontal: false });
+      if (faces.length === 0) {
+        return null;
+      }
 
       const face = faces[0];
       const keypoints = face.keypoints;
 
-      // Get key landmarks for head pose estimation
-      const noseTip = keypoints.find(kp => kp.name === 'noseTip');
-      const leftEye = keypoints.find(kp => kp.name === 'leftEyeOuter');
-      const rightEye = keypoints.find(kp => kp.name === 'rightEyeOuter');
-      const leftCheek = keypoints.find(kp => kp.name === 'leftCheek');
-      const rightCheek = keypoints.find(kp => kp.name === 'rightCheek');
-      const mouthLeft = keypoints.find(kp => kp.name === 'mouthLeft');
-      const mouthRight = keypoints.find(kp => kp.name === 'mouthRight');
-      const chin = keypoints.find(kp => kp.name === 'chin');
+      // Get key landmarks - use indices instead of names for reliability
+      // MediaPipe Face Landmarks: nose tip = 1, left eye = 33, right eye = 263, chin = 152
+      const noseTip = keypoints[1]; // noseTip
+      const leftEye = keypoints[33]; // leftEyeOuter  
+      const rightEye = keypoints[263]; // rightEyeOuter
+      const chin = keypoints[152]; // chin
 
-      if (!noseTip || !leftEye || !rightEye || !chin) return null;
+      if (!noseTip || !leftEye || !rightEye || !chin) {
+        console.warn('Missing required landmarks');
+        return null;
+      }
 
-      // Calculate head pose angles using face landmarks
+      // Calculate bounding box from all points
       const allX = keypoints.map(kp => kp.x);
       const allY = keypoints.map(kp => kp.y);
       const minX = Math.min(...allX);
@@ -234,28 +239,31 @@ export default function LoginPage() {
       
       const faceWidth = maxX - minX;
       const faceHeight = maxY - minY;
+      
+      if (faceWidth === 0 || faceHeight === 0) {
+        return null;
+      }
+
       const faceCenterX = minX + faceWidth / 2;
       const faceCenterY = minY + faceHeight / 2;
 
-      // YAW angle (left/right head rotation)
-      // Nose position relative to face center, normalized by face width
+      // YAW angle (left/right): how far nose is from center horizontally
       const noseOffsetX = noseTip.x - faceCenterX;
-      const yawAngle = (noseOffsetX / faceWidth) * 60; // Scale to ±30° range
+      const yawAngle = (noseOffsetX / (faceWidth / 2)) * 45; // ±45° range
 
-      // PITCH angle (up/down head tilt)
-      // Nose position relative to face center, normalized by face height
+      // PITCH angle (up/down): how far nose is from center vertically  
       const noseOffsetY = noseTip.y - faceCenterY;
-      const pitchAngle = (noseOffsetY / faceHeight) * 40; // Scale to ±20° range
+      const pitchAngle = (noseOffsetY / (faceHeight / 2)) * 35; // ±35° range
 
-      // ROLL angle (side tilt) - eye level
+      // ROLL angle (tilt)
       const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
 
       // Determine direction based on angles
       let direction: "left" | "right" | "up" | "down" | "center" = "center";
 
-      // Thresholds - calibrated for the new calculation method
-      const yawThreshold = 5; // Left/right detection threshold
-      const pitchThreshold = 4; // Up/down detection threshold
+      // More aggressive thresholds for easier detection
+      const yawThreshold = 12;
+      const pitchThreshold = 10;
 
       if (yawAngle < -yawThreshold) {
         direction = "left";
@@ -267,10 +275,7 @@ export default function LoginPage() {
         direction = "down";
       }
 
-      // Debug logging
-      if (Math.abs(yawAngle) > 5 || Math.abs(pitchAngle) > 4) {
-        console.log('Face angles - Yaw:', yawAngle.toFixed(2), 'Pitch:', pitchAngle.toFixed(2), 'Direction:', direction);
-      }
+      console.log('Angles - Yaw:', yawAngle.toFixed(1), 'Pitch:', pitchAngle.toFixed(1), 'Direction:', direction);
 
       return { 
         direction, 
