@@ -835,29 +835,23 @@ export default function LoginPage() {
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {/* Top bracket */}
                     {currentDirection === "up" && (
-                      <div className="absolute top-2 left-1/2 transform -translate-x-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <svg width="60" height="20" viewBox="0 0 60 20" fill="none">
-                          <path d="M 10 15 L 10 5 L 20 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M 50 15 L 50 5 L 40 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
+                      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <div className="text-3xl font-bold">(</div>
+                        <div className="text-3xl font-bold" style={{ transform: 'scaleX(-1)' }}>)</div>
                       </div>
                     )}
                     {/* Left bracket */}
                     {currentDirection === "left" && (
-                      <div className="absolute left-2 top-1/2 transform -translate-y-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <svg width="20" height="60" viewBox="0 0 20 60" fill="none">
-                          <path d="M 15 10 L 5 10 L 5 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M 15 50 L 5 50 L 5 40" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
+                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <div className="text-3xl font-bold" style={{ transform: 'rotate(90deg)' }}>)</div>
+                        <div className="text-3xl font-bold" style={{ transform: 'rotate(90deg)' }}>(</div>
                       </div>
                     )}
                     {/* Right bracket */}
                     {currentDirection === "right" && (
-                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <svg width="20" height="60" viewBox="0 0 20 60" fill="none">
-                          <path d="M 5 10 L 15 10 L 15 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M 5 50 L 15 50 L 15 40" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
+                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <div className="text-3xl font-bold" style={{ transform: 'rotate(-90deg)' }}>(</div>
+                        <div className="text-3xl font-bold" style={{ transform: 'rotate(-90deg)' }}>)</div>
                       </div>
                     )}
                   </div>
