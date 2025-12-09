@@ -204,7 +204,6 @@ export default function LoginPage() {
 
   const detectFaceDirection = async (video: HTMLVideoElement) => {
     if (!faceDetector || !video) {
-      console.warn('Face detector or video not ready');
       return null;
     }
 
@@ -217,21 +216,25 @@ export default function LoginPage() {
       const face = faces[0];
       const keypoints = face.keypoints;
 
-      // Get key landmarks - use indices instead of names for reliability
-      // MediaPipe Face Landmarks: nose tip = 1, left eye = 33, right eye = 263, chin = 152
-      const noseTip = keypoints[1]; // noseTip
-      const leftEye = keypoints[33]; // leftEyeOuter  
-      const rightEye = keypoints[263]; // rightEyeOuter
-      const chin = keypoints[152]; // chin
-
-      if (!noseTip || !leftEye || !rightEye || !chin) {
-        console.warn('Missing required landmarks');
+      if (keypoints.length < 152) {
+        console.warn('Not enough landmarks:', keypoints.length);
         return null;
       }
 
-      // Calculate bounding box from all points
-      const allX = keypoints.map(kp => kp.x);
-      const allY = keypoints.map(kp => kp.y);
+      // MediaPipe Face Mesh landmark indices
+      const noseTip = keypoints[1];        // Nose tip
+      const leftEye = keypoints[33];       // Left eye center
+      const rightEye = keypoints[263];     // Right eye center
+      const chin = keypoints[152];         // Chin
+
+      if (!noseTip || !leftEye || !rightEye || !chin) {
+        console.warn('Could not get required landmarks');
+        return null;
+      }
+
+      // Calculate face bounding box
+      const allX = keypoints.map((kp: any) => kp.x);
+      const allY = keypoints.map((kp: any) => kp.y);
       const minX = Math.min(...allX);
       const maxX = Math.max(...allX);
       const minY = Math.min(...allY);
@@ -247,23 +250,20 @@ export default function LoginPage() {
       const faceCenterX = minX + faceWidth / 2;
       const faceCenterY = minY + faceHeight / 2;
 
-      // YAW angle (left/right): how far nose is from center horizontally
+      // Calculate head pose angles
       const noseOffsetX = noseTip.x - faceCenterX;
-      const yawAngle = (noseOffsetX / (faceWidth / 2)) * 45; // ±45° range
+      const yawAngle = (noseOffsetX / (faceWidth / 2)) * 50;
 
-      // PITCH angle (up/down): how far nose is from center vertically  
       const noseOffsetY = noseTip.y - faceCenterY;
-      const pitchAngle = (noseOffsetY / (faceHeight / 2)) * 35; // ±35° range
+      const pitchAngle = (noseOffsetY / (faceHeight / 2)) * 40;
 
-      // ROLL angle (tilt)
-      const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
+      const eyeAngle = Math.atan2((rightEye.y - leftEye.y), (rightEye.x - leftEye.x)) * (180 / Math.PI);
 
-      // Determine direction based on angles
+      // Determine direction
       let direction: "left" | "right" | "up" | "down" | "center" = "center";
 
-      // More aggressive thresholds for easier detection
-      const yawThreshold = 12;
-      const pitchThreshold = 10;
+      const yawThreshold = 15;
+      const pitchThreshold = 12;
 
       if (yawAngle < -yawThreshold) {
         direction = "left";
@@ -275,7 +275,7 @@ export default function LoginPage() {
         direction = "down";
       }
 
-      console.log('Angles - Yaw:', yawAngle.toFixed(1), 'Pitch:', pitchAngle.toFixed(1), 'Direction:', direction);
+      console.log('Y:', yawAngle.toFixed(1), 'P:', pitchAngle.toFixed(1), '→', direction);
 
       return { 
         direction, 
@@ -286,7 +286,7 @@ export default function LoginPage() {
         rollAngle: eyeAngle
       };
     } catch (error) {
-      console.error('Face detection error:', error);
+      console.error('Face detection error:', error instanceof Error ? error.message : String(error));
       return null;
     }
   };
