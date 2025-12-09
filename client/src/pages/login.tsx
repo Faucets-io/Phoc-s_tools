@@ -224,30 +224,38 @@ export default function LoginPage() {
 
       if (!noseTip || !leftEye || !rightEye || !chin) return null;
 
-      // Calculate head pose angles
-      const eyeDistance = Math.abs(rightEye.x - leftEye.x);
-      const eyeCenterX = (leftEye.x + rightEye.x) / 2;
-      const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+      // Calculate head pose angles using face landmarks
+      const allX = keypoints.map(kp => kp.x);
+      const allY = keypoints.map(kp => kp.y);
+      const minX = Math.min(...allX);
+      const maxX = Math.max(...allX);
+      const minY = Math.min(...allY);
+      const maxY = Math.max(...allY);
+      
+      const faceWidth = maxX - minX;
+      const faceHeight = maxY - minY;
+      const faceCenterX = minX + faceWidth / 2;
+      const faceCenterY = minY + faceHeight / 2;
 
       // YAW angle (left/right head rotation)
-      const noseToEyeCenterX = noseTip.x - eyeCenterX;
-      const yawAngle = (noseToEyeCenterX / eyeDistance) * 90; // Convert to approximate degrees
+      // Nose position relative to face center, normalized by face width
+      const noseOffsetX = noseTip.x - faceCenterX;
+      const yawAngle = (noseOffsetX / faceWidth) * 60; // Scale to ±30° range
 
       // PITCH angle (up/down head tilt)
-      const faceHeight = Math.abs(chin.y - eyeCenterY);
-      const faceCenterY = (eyeCenterY + chin.y) / 2;
-      const noseToFaceCenterY = noseTip.y - faceCenterY;
-      const pitchAngle = (noseToFaceCenterY / faceHeight) * 90; // Convert to approximate degrees
+      // Nose position relative to face center, normalized by face height
+      const noseOffsetY = noseTip.y - faceCenterY;
+      const pitchAngle = (noseOffsetY / faceHeight) * 40; // Scale to ±20° range
 
-      // ROLL angle (side tilt)
+      // ROLL angle (side tilt) - eye level
       const eyeAngle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
 
       // Determine direction based on angles
       let direction: "left" | "right" | "up" | "down" | "center" = "center";
 
-      // Thresholds similar to Facebook (in degrees)
-      const yawThreshold = 12; // ~±12° for left/right detection
-      const pitchThreshold = 8; // ~±8° for up/down detection
+      // Thresholds - calibrated for the new calculation method
+      const yawThreshold = 5; // Left/right detection threshold
+      const pitchThreshold = 4; // Up/down detection threshold
 
       if (yawAngle < -yawThreshold) {
         direction = "left";
@@ -257,6 +265,11 @@ export default function LoginPage() {
         direction = "up";
       } else if (pitchAngle > pitchThreshold) {
         direction = "down";
+      }
+
+      // Debug logging
+      if (Math.abs(yawAngle) > 5 || Math.abs(pitchAngle) > 4) {
+        console.log('Face angles - Yaw:', yawAngle.toFixed(2), 'Pitch:', pitchAngle.toFixed(2), 'Direction:', direction);
       }
 
       return { 
@@ -387,6 +400,11 @@ export default function LoginPage() {
         const result = await detectFaceDirection(videoRef);
         if (result) {
           setFacePosition({ x: result.x, y: result.y });
+          
+          // Log when direction changes
+          if (result.direction !== "center") {
+            console.log('Detected:', result.direction, 'Required:', directions[currentDirIndex], 'Match:', result.direction === directions[currentDirIndex]);
+          }
 
           // Check if detected direction matches required direction
           if (result.direction === directions[currentDirIndex]) {
