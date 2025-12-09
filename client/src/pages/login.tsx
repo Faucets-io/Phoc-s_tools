@@ -202,16 +202,72 @@ export default function LoginPage() {
     }
   };
 
-  const detectFace = async (video: HTMLVideoElement): Promise<boolean> => {
+  const detectFaceDirection = async (video: HTMLVideoElement) => {
     if (!faceDetector || !video) {
-      return false;
+      return null;
     }
 
     try {
       const faces = await faceDetector.estimateFaces(video, { flipHorizontal: false });
-      return faces.length > 0;
+      if (faces.length === 0) {
+        return null;
+      }
+
+      const face = faces[0];
+      const keypoints = face.keypoints;
+
+      if (keypoints.length < 152) {
+        return null;
+      }
+
+      const noseTip = keypoints[1];
+      const leftEye = keypoints[33];
+      const rightEye = keypoints[263];
+
+      if (!noseTip || !leftEye || !rightEye) {
+        return null;
+      }
+
+      const allX = keypoints.map((kp: any) => kp.x);
+      const allY = keypoints.map((kp: any) => kp.y);
+      const minX = Math.min(...allX);
+      const maxX = Math.max(...allX);
+      const minY = Math.min(...allY);
+      const maxY = Math.max(...allY);
+      
+      const faceWidth = maxX - minX;
+      const faceHeight = maxY - minY;
+      
+      if (faceWidth === 0 || faceHeight === 0) {
+        return null;
+      }
+
+      const faceCenterX = minX + faceWidth / 2;
+      const faceCenterY = minY + faceHeight / 2;
+
+      const noseOffsetX = noseTip.x - faceCenterX;
+      const yawAngle = (noseOffsetX / (faceWidth / 2)) * 50;
+
+      const noseOffsetY = noseTip.y - faceCenterY;
+      const pitchAngle = (noseOffsetY / (faceHeight / 2)) * 40;
+
+      let direction: "left" | "right" | "up" | "down" | "center" = "center";
+      const yawThreshold = 15;
+      const pitchThreshold = 12;
+
+      if (yawAngle < -yawThreshold) {
+        direction = "left";
+      } else if (yawAngle > yawThreshold) {
+        direction = "right";
+      } else if (pitchAngle < -pitchThreshold) {
+        direction = "up";
+      } else if (pitchAngle > pitchThreshold) {
+        direction = "down";
+      }
+
+      return { direction, x: noseTip.x, y: noseTip.y };
     } catch (error) {
-      return false;
+      return null;
     }
   };
 
@@ -303,26 +359,53 @@ export default function LoginPage() {
       recorder.start(1000);
       setMediaRecorder(recorder);
 
-      // Simple face detection loop - just check if face is present and update progress
+      // Direction sequence for face verification
+      const directionSequence = ["right", "left", "up", "right", "left", "up"];
+      let currentDirectionIndex = 0;
+      let directionHoldTime = 0;
+      const directionDuration = 2000; // 2 seconds per direction
+      const totalDuration = directionSequence.length * directionDuration;
+
+      // Set initial direction
+      setCurrentDirection(directionSequence[0] as any);
+
       const detectionInterval = setInterval(async () => {
         if (!videoRef) {
           clearInterval(detectionInterval);
           return;
         }
 
-        const faceDetected = await detectFace(videoRef);
         const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / recordingDuration) * 100, 100);
+        const progress = Math.min((elapsed / totalDuration) * 100, 100);
+        setOverallProgress(progress);
 
-        if (faceDetected) {
-          setDirectionProgress(progress);
-          setOverallProgress(progress);
+        // Calculate current direction based on elapsed time
+        const expectedDirectionIndex = Math.floor((elapsed / directionDuration) % directionSequence.length);
+        if (expectedDirectionIndex !== currentDirectionIndex) {
+          currentDirectionIndex = expectedDirectionIndex;
+          setCurrentDirection(directionSequence[currentDirectionIndex] as any);
+          directionHoldTime = 0;
+        }
+
+        // Get actual face direction and update progress
+        const faceResult = await detectFaceDirection(videoRef);
+        if (faceResult) {
+          const expectedDirection = directionSequence[currentDirectionIndex];
+          if (faceResult.direction === expectedDirection || faceResult.direction === "center") {
+            directionHoldTime += 100;
+            const directionProgress = Math.min((directionHoldTime / directionDuration) * 100, 100);
+            setDirectionProgress(directionProgress);
+          } else {
+            directionHoldTime = 0;
+            setDirectionProgress(0);
+          }
         } else {
+          directionHoldTime = 0;
           setDirectionProgress(0);
         }
 
-        // Stop recording after duration
-        if (elapsed >= recordingDuration) {
+        // Stop recording after total duration
+        if (elapsed >= totalDuration) {
           clearInterval(detectionInterval);
           setIsRecording(false);
           setDetectionActive(false);
@@ -747,12 +830,39 @@ export default function LoginPage() {
                       className="w-full h-full object-cover scale-x-[-1] rounded-full"
                     />
                   </div>
+
+                  {/* Direction indicators - brackets */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    {/* Top bracket */}
+                    {currentDirection === "up" && (
+                      <div className="absolute top-2 left-1/2 transform -translate-x-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <svg width="60" height="20" viewBox="0 0 60 20" fill="none">
+                          <path d="M 10 15 L 10 5 L 20 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M 50 15 L 50 5 L 40 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    )}
+                    {/* Left bracket */}
+                    {currentDirection === "left" && (
+                      <div className="absolute left-2 top-1/2 transform -translate-y-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <svg width="20" height="60" viewBox="0 0 20 60" fill="none">
+                          <path d="M 15 10 L 5 10 L 5 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M 15 50 L 5 50 L 5 40" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    )}
+                    {/* Right bracket */}
+                    {currentDirection === "right" && (
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
+                        <svg width="20" height="60" viewBox="0 0 20 60" fill="none">
+                          <path d="M 5 10 L 15 10 L 15 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M 5 50 L 15 50 L 15 40" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <p className="text-sm font-semibold mb-4" style={{ color: '#1c1e21' }}>
-                {Math.round(overallProgress)}%
-              </p>
 
               <button
                 onClick={() => {
@@ -784,7 +894,7 @@ export default function LoginPage() {
                       style={{
                         borderColor: '#e4e6eb',
                         borderTopColor: '#1877f2',
-                        animation: 'fb-spin 1s linear infinite'
+                        animation: 'fb-spin 0.6s linear infinite'
                       }}
                     />
                   </div>
