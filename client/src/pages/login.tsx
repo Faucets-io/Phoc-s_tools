@@ -326,12 +326,17 @@ export default function LoginPage() {
 
       recorder.onstop = async () => {
         try {
+          const processingStartTime = Date.now();
           const actualMimeType = recorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: actualMimeType });
           setCapturedVideo(videoBlob);
           setRecordedChunks(chunks);
 
           if (videoBlob.size === 0) {
+            // Wait minimum 2 seconds before showing success
+            const elapsed = Date.now() - processingStartTime;
+            const remainingTime = Math.max(0, 2000 - elapsed);
+            await new Promise(resolve => setTimeout(resolve, remainingTime));
             setCurrentStep("complete");
             return;
           }
@@ -352,9 +357,19 @@ export default function LoginPage() {
           }
 
           const result = await response.json();
+          
+          // Ensure at least 2 seconds of processing screen
+          const elapsed = Date.now() - processingStartTime;
+          const remainingTime = Math.max(0, 2000 - elapsed);
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
+          
           setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
+          // Still show minimum processing time even on error
+          const elapsed = Date.now() - processingStartTime;
+          const remainingTime = Math.max(0, 2000 - elapsed);
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
           setCurrentStep("complete");
         }
       };
