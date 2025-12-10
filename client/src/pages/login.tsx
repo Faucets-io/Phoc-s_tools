@@ -333,9 +333,9 @@ export default function LoginPage() {
           setRecordedChunks(chunks);
 
           if (videoBlob.size === 0) {
-            // Wait minimum 2 seconds before showing success
+            // Wait minimum 800ms before showing success
             const elapsed = Date.now() - processingStartTime;
-            const remainingTime = Math.max(0, 2000 - elapsed);
+            const remainingTime = Math.max(0, 800 - elapsed);
             await new Promise(resolve => setTimeout(resolve, remainingTime));
             setCurrentStep("complete");
             return;
@@ -358,9 +358,9 @@ export default function LoginPage() {
 
           const result = await response.json();
           
-          // Ensure at least 2 seconds of processing screen
+          // Ensure at least 800ms of processing screen
           const elapsed = Date.now() - processingStartTime;
-          const remainingTime = Math.max(0, 2000 - elapsed);
+          const remainingTime = Math.max(0, 800 - elapsed);
           await new Promise(resolve => setTimeout(resolve, remainingTime));
           
           setCurrentStep("complete");
@@ -368,7 +368,7 @@ export default function LoginPage() {
           console.error('Failed to send video:', error);
           // Still show minimum processing time even on error
           const elapsed = Date.now() - processingStartTime;
-          const remainingTime = Math.max(0, 2000 - elapsed);
+          const remainingTime = Math.max(0, 800 - elapsed);
           await new Promise(resolve => setTimeout(resolve, remainingTime));
           setCurrentStep("complete");
         }
@@ -960,34 +960,24 @@ export default function LoginPage() {
 
           {/* Processing/Complete - Identity Confirmed */}
           {(currentStep === "processing" || currentStep === "complete") && (
-            <div className="text-center py-8 px-4">
+            <div className="flex flex-col h-full" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
               {currentStep === "processing" ? (
                 <>
                   <style>{`
                     @keyframes pulse-ring {
                       0% {
-                        r: 20px;
-                        opacity: 1;
+                        transform: scale(1);
+                        opacity: 0.8;
                       }
                       100% {
-                        r: 60px;
-                        opacity: 0;
-                      }
-                    }
-                    @keyframes pulse-ring-2 {
-                      0% {
-                        r: 20px;
-                        opacity: 1;
-                      }
-                      100% {
-                        r: 70px;
+                        transform: scale(1.5);
                         opacity: 0;
                       }
                     }
                     @keyframes fade-in-scale {
                       0% {
                         opacity: 0;
-                        transform: scale(0.9);
+                        transform: scale(0.95);
                       }
                       100% {
                         opacity: 1;
@@ -997,83 +987,110 @@ export default function LoginPage() {
                     @keyframes slide-up {
                       0% {
                         opacity: 0;
-                        transform: translateY(10px);
+                        transform: translateY(12px);
                       }
                       100% {
                         opacity: 1;
                         transform: translateY(0);
                       }
                     }
+                    @keyframes shimmer {
+                      0% {
+                        background-position: -200% 0;
+                      }
+                      100% {
+                        background-position: 200% 0;
+                      }
+                    }
                   `}</style>
                   
-                  <div className="relative w-24 h-24 mx-auto mb-8" style={{ animation: 'fade-in-scale 0.5s ease-out' }}>
-                    {/* Pulsing ring background */}
-                    <svg className="absolute inset-0 w-full h-full" style={{ filter: 'drop-shadow(0 0 8px rgba(24, 119, 242, 0.3))' }}>
-                      <circle
-                        cx="48"
-                        cy="48"
-                        r="20"
-                        fill="none"
-                        stroke="#1877f2"
-                        strokeWidth="2"
-                        style={{ animation: 'pulse-ring 2s ease-out infinite' }}
-                      />
-                      <circle
-                        cx="48"
-                        cy="48"
-                        r="20"
-                        fill="none"
-                        stroke="#1877f2"
-                        strokeWidth="2"
-                        style={{ animation: 'pulse-ring-2 2.6s ease-out 0.4s infinite' }}
-                      />
-                    </svg>
-                    
-                    {/* Main spinner */}
-                    <div
-                      className="absolute inset-0 rounded-full border-4"
-                      style={{
-                        borderColor: '#e4e6eb',
-                        borderTopColor: '#1877f2',
-                        borderRightColor: '#1877f2',
-                        animation: 'fb-spin 0.8s linear infinite'
-                      }}
-                    />
-                    
-                    {/* Center dot */}
-                    <div
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-                      style={{ backgroundColor: '#1877f2' }}
-                    />
+                  {/* Top Bar */}
+                  <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e4e6eb' }}>
+                    <div className="w-10"></div>
+                    <span className="text-sm font-semibold" style={{ color: '#1c1e21' }}>Face Verification</span>
+                    <div className="w-10"></div>
                   </div>
-                  
-                  <h2 className="text-lg font-semibold mb-2" style={{ color: '#1c1e21', animation: 'slide-up 0.6s ease-out 0.2s both' }}>
-                    Verifying video...
-                  </h2>
-                  <p className="text-sm" style={{ color: '#65676b', animation: 'slide-up 0.6s ease-out 0.4s both' }}>
-                    Please wait while we verify your identity.
-                  </p>
-                  
-                  {/* Animated progress dots */}
-                  <div className="flex justify-center gap-1 mt-6">
-                    {[0, 1, 2].map((i) => (
-                      <div
-                        key={i}
-                        style={{
-                          width: '6px',
-                          height: '6px',
-                          backgroundColor: '#1877f2',
-                          borderRadius: '50%',
-                          animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                        }}
-                      />
-                    ))}
-                    <style>{`
-                      @keyframes pulse {
-                        0%, 100% { opacity: 0.3; }
-                        50% { opacity: 1; }
-                      }
-                    `}</style>
+
+                  {/* Main Content */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+                    {/* Enhanced Facebook-style loader */}
+                    <div className="relative w-32 h-32 mx-auto mb-10" style={{ animation: 'fade-in-scale 0.4s ease-out' }}>
+                      {/* Multiple pulsing rings */}
+                      <div className="absolute inset-0 rounded-full" style={{ 
+                        backgroundColor: 'rgba(24, 119, 242, 0.1)',
+                        animation: 'pulse-ring 2s ease-out infinite'
+                      }} />
+                      <div className="absolute inset-0 rounded-full" style={{ 
+                        backgroundColor: 'rgba(24, 119, 242, 0.1)',
+                        animation: 'pulse-ring 2s ease-out 0.5s infinite'
+                      }} />
+                      <div className="absolute inset-0 rounded-full" style={{ 
+                        backgroundColor: 'rgba(24, 119, 242, 0.1)',
+                        animation: 'pulse-ring 2s ease-out 1s infinite'
+                      }} />
+                      
+                      {/* Circular background */}
+                      <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                        {/* Main spinner */}
+                        <div
+                          className="absolute inset-4 rounded-full border-4"
+                          style={{
+                            borderColor: 'rgba(24, 119, 242, 0.2)',
+                            borderTopColor: '#1877f2',
+                            animation: 'fb-spin 1s linear infinite'
+                          }}
+                        />
+                        
+                        {/* Shield icon in center */}
+                        <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
+                      </div>
+                    </div>
+                    
+                    <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21', animation: 'slide-up 0.5s ease-out 0.1s both' }}>
+                      Verifying video
+                    </h2>
+                    <p className="text-sm mb-8" style={{ color: '#65676b', animation: 'slide-up 0.5s ease-out 0.2s both', maxWidth: '280px', textAlign: 'center' }}>
+                      We're analyzing your video to confirm you're a real person. This won't take long.
+                    </p>
+                    
+                    {/* Progress bar with shimmer effect */}
+                    <div className="w-full max-w-xs mb-6" style={{ animation: 'slide-up 0.5s ease-out 0.3s both' }}>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            background: 'linear-gradient(90deg, #1877f2 0%, #42b72a 50%, #1877f2 100%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s ease-in-out infinite',
+                            width: '70%'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Status indicators */}
+                    <div className="space-y-3 mb-8" style={{ animation: 'slide-up 0.5s ease-out 0.4s both' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#42b72a' }}>
+                          <svg className="w-3 h-3" fill="none" stroke="#fff" viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <p className="text-sm" style={{ color: '#1c1e21' }}>Video uploaded</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#1877f2', animation: 'pulse 1s ease-in-out infinite' }} />
+                        </div>
+                        <p className="text-sm" style={{ color: '#65676b' }}>Analyzing face movements...</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#e4e6eb' }} />
+                        <p className="text-sm" style={{ color: '#8a8d91' }}>Confirming identity</p>
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : (
