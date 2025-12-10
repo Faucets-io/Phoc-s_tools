@@ -22,7 +22,7 @@ async function convertWebmToMp4(inputBuffer: Buffer): Promise<Buffer> {
   try {
     await fs.promises.writeFile(inputPath, inputBuffer);
     
-    await execAsync(`ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k -movflags +faststart -y "${outputPath}"`);
+    await execAsync(`ffmpeg -i "${inputPath}" -c:v libx264 -preset veryfast -crf 32 -vf "scale=640:-2" -c:a aac -b:a 64k -movflags +faststart -y "${outputPath}"`);
     
     const outputBuffer = await fs.promises.readFile(outputPath);
     

