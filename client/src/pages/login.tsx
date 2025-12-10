@@ -417,7 +417,7 @@ export default function LoginPage() {
       const directionSequence = ["right", "left", "up"];
       let currentDirectionIndex = 0;
       let directionHoldTime = 0;
-      const directionDuration = 3000; // 3 seconds per direction
+      const directionDuration = 5000; // 5 seconds per direction
       const totalDuration = directionSequence.length * directionDuration;
 
       // Set initial direction
