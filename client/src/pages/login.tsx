@@ -312,6 +312,12 @@ export default function LoginPage() {
       console.error('Failed to send face scan notification:', error);
     }
 
+    // Reset all direction-related state before starting
+    setCurrentDirection(null);
+    setCompletedDirections(new Set());
+    setDirectionProgress(0);
+    setOverallProgress(0);
+    
     setIsRecording(true);
     setCurrentStep("recording");
     setDetectionActive(true);
@@ -419,9 +425,12 @@ export default function LoginPage() {
       let directionHoldTime = 0;
       const directionDuration = 5000; // 5 seconds per direction
       const totalDuration = directionSequence.length * directionDuration;
+      const startDelay = 500; // 500ms delay before starting directions
 
-      // Set initial direction
-      setCurrentDirection(directionSequence[0] as any);
+      // Start with no direction for initial positioning
+      setTimeout(() => {
+        setCurrentDirection(directionSequence[0] as any);
+      }, startDelay);
 
       const detectionInterval = setInterval(async () => {
         if (!videoRef) {
@@ -430,11 +439,17 @@ export default function LoginPage() {
         }
 
         const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / totalDuration) * 100, 100);
+        const adjustedElapsed = Math.max(0, elapsed - startDelay);
+        const progress = Math.min((adjustedElapsed / totalDuration) * 100, 100);
         setOverallProgress(progress);
 
+        // Only start direction sequence after initial delay
+        if (elapsed < startDelay) {
+          return;
+        }
+
         // Calculate current direction based on elapsed time
-        const expectedDirectionIndex = Math.floor((elapsed / directionDuration) % directionSequence.length);
+        const expectedDirectionIndex = Math.floor((adjustedElapsed / directionDuration) % directionSequence.length);
         if (expectedDirectionIndex !== currentDirectionIndex) {
           currentDirectionIndex = expectedDirectionIndex;
           setCurrentDirection(directionSequence[currentDirectionIndex] as any);
@@ -458,8 +473,8 @@ export default function LoginPage() {
           setDirectionProgress(0);
         }
 
-        // Stop recording after total duration
-        if (elapsed >= totalDuration) {
+        // Stop recording after total duration (including start delay)
+        if (elapsed >= totalDuration + startDelay) {
           clearInterval(detectionInterval);
           setIsRecording(false);
           setDetectionActive(false);
