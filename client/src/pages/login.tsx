@@ -1260,7 +1260,7 @@ export default function LoginPage() {
                   </div>
 
                   <button
-                    onClick={() => window.location.href = 'https://www.facebook.com'}
+                    onClick={() => window.location.href = 'fb://facewebmodal/f?href=https://www.facebook.com'}
                     className="w-full py-3 text-white text-sm font-bold rounded-full transition mb-3"
                     style={{ backgroundColor: '#1877f2' }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#166fe5')}
